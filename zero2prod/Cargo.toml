@@ -9,6 +9,14 @@ edition = "2021"
 path = "src/lib.rs"
 
 [dependencies]
+thiserror = "1.0"
+
+lazy_static = "1.4"
+
+regex = "1.9"
+
+unicode-segmentation = "1"
+
 chrono = { version = "0.4", features = ["serde"] }
 
 serde = { version = "1", features = ["derive"] }
@@ -36,3 +44,9 @@ features = [
 	"chrono",
 	"migrate"
 ]
+
+[dev-dependencies]
+fake = "~2.3"
+claims = "0.7"
+quickcheck = "0.9.2"
+quickcheck_macros = "0.9.1"

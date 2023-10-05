@@ -2,14 +2,16 @@ use uuid::Uuid;
 
 use chrono::{DateTime, Utc};
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use sqlx::PgPool;
 
-#[derive(Debug, Deserialize)]
+use crate::domain::EmailAddress;
+
+#[derive(Debug)]
 pub struct NewSubscription {
     pub name: String,
-    pub email: String,
+    pub email: EmailAddress,
 }
 
 #[derive(Debug, Serialize)]
@@ -29,7 +31,7 @@ impl Subscription {
         let row = sqlx::query!(
             "insert into subscriptions(name, email) values ($1, $2) returning id",
             new_subscriber.name,
-            new_subscriber.email
+            new_subscriber.email.as_ref(),
         )
         .fetch_one(pool)
         .await?;

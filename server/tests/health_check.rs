@@ -51,28 +51,32 @@ async fn subcribe_returns_success_for_valid_request(pool: PgPool) -> sqlx::Resul
 async fn subcribe_returns_bad_request_for_missing_data(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
-    let test_cases: Vec<NewSubscriber> = vec![
-        NewSubscriber {
-            name: Some("Missing email".into()),
+    let test_cases: Vec<(String, NewSubscriber)> = vec![
+        ("Missing email".into(), NewSubscriber {
+            name: Some("Test name".into()),
             email: None,
-        },
-        NewSubscriber {
+        }),
+        ("Missing name".into(), NewSubscriber {
             name: None,
-            email: Some("missing_name@test.com".into()),
-        },
-        NewSubscriber {
+            email: Some("test@test.com".into()),
+        }),
+        ("Missing both email and name".into(), NewSubscriber {
             name: None,
             email: None,
-        },
+        }),
+        ("Malformed email".into(), NewSubscriber {
+            name: Some("Test name".into()),
+            email: Some("bad email address".into()),
+        }),
     ];
 
-    for new_subscriber in test_cases {
+    for (desc, new_subscriber) in test_cases {
         let res = app
             .subscription_create(&new_subscriber)
             .await
             .expect("Failed to execute request");
 
-        assert_eq!(StatusCode::BAD_REQUEST, res.status());
+        assert_eq!(StatusCode::BAD_REQUEST, res.status(), "API did not fail when payload was {}", desc);
     }
     Ok(())
 }
