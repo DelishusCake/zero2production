@@ -24,6 +24,7 @@ pub struct Subscription {
 }
 
 impl Subscription {
+    #[tracing::instrument(name = "Insert subscriber", skip(pool))]
     pub async fn insert(pool: &PgPool, new_subscriber: NewSubscription) -> sqlx::Result<Uuid> {
         let row = sqlx::query!(
             "insert into subscriptions(name, email) values ($1, $2) returning id",

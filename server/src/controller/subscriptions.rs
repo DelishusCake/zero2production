@@ -26,6 +26,7 @@ impl TryInto<NewSubscription> for NewSubscriptionForm {
     }
 }
 
+#[tracing::instrument(name = "Create a new subscriber", skip(pool))]
 #[post("")]
 async fn create(
     pool: web::Data<PgPool>,
@@ -36,7 +37,7 @@ async fn create(
     let _id = Subscription::insert(&pool, new_subscription)
         .await
         .map_err(|e| {
-            eprintln!("{:?}", e);
+            tracing::error!("{:?}", e);
             RestError::InternalServerError
         })?;
 

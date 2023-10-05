@@ -3,13 +3,40 @@ use std::path::Path;
 
 use anyhow::Context;
 
-use config::{Config, File};
+use config::{Config, Environment, File};
 
 use secrecy::Secret;
 
 use serde::Deserialize;
 
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
+
+#[derive(Debug)]
+pub enum Runtime {
+    Dev,
+    Prod,
+}
+
+impl Runtime {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Runtime::Dev => "dev",
+            Runtime::Prod => "prod",
+        }
+    }
+}
+
+impl TryFrom<String> for Runtime {
+    type Error = anyhow::Error;
+
+    fn try_from(s: String) -> anyhow::Result<Self> {
+        match s.to_lowercase().as_str() {
+            "dev" => Ok(Self::Dev),
+            "prod" => Ok(Self::Prod),
+            other => anyhow::bail!("{} is not a valid runtime environment", other),
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
@@ -21,12 +48,18 @@ impl Settings {
     pub fn load() -> anyhow::Result<Self> {
         let path = env::current_dir()?.join("settings");
 
-        Self::load_from(&path)
+        let runtime: Runtime = env::var("APP_ENV")
+            .unwrap_or_else(|_| "dev".into())
+            .try_into()?;
+
+        Self::load_from(runtime, &path)
     }
 
-    pub fn load_from(path: &Path) -> anyhow::Result<Self> {
+    pub fn load_from(runtime: Runtime, base_path: &Path) -> anyhow::Result<Self> {
         Config::builder()
-            .add_source(File::from(path.join("dev")).required(true))
+            .add_source(File::from(base_path.join("base")).required(true))
+            .add_source(File::from(base_path.join(runtime.as_str())).required(true))
+            .add_source(Environment::with_prefix("app").separator("__"))
             .build()?
             .try_deserialize()
             .context("Failed to load/deserialize settings")
