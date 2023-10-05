@@ -28,3 +28,4 @@ docker run \
 echo "DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}" > .env
 # Have sqlx create the database
 sqlx database create
+sqlx migrate run
