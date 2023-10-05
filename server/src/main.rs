@@ -15,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
 
     let settings = Settings::load()?;
 
-    let pool = PgPool::connect_with(settings.database.with_db()).await?;
+    let pool = PgPool::connect_lazy_with(settings.database.with_db());
 
     let listener = TcpListener::bind(settings.app.addr())?;
     tracing::info!("Running app on: {}", listener.local_addr()?);

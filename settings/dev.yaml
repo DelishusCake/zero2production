@@ -1,6 +1,5 @@
 app:
   host: localhost
-  port: 8080
 database:
   name: newsletter
   host: localhost
