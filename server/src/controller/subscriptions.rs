@@ -5,32 +5,42 @@ use serde::Deserialize;
 
 use sqlx::PgPool;
 
+use zero2prod::model::{NewSubscription, Subscription};
+
+use crate::error::{RestError, RestResult};
+
 #[derive(Debug, Deserialize)]
-struct NewSubscriberForm {
+struct NewSubscriptionForm {
     name: String,
     email: String,
 }
 
-#[post("")]
-async fn create(form: web::Form<NewSubscriberForm>, pool: web::Data<PgPool>) -> impl Responder {
-    match insert_subscriber(&pool, &form.name, &form.email).await {
-        Ok(_) => HttpResponse::Created().finish(),
-        Err(e) => {
-            eprintln!("{:?}", e);
-            HttpResponse::InternalServerError().finish()
-        }
+impl TryInto<NewSubscription> for NewSubscriptionForm {
+    type Error = RestError;
+
+    fn try_into(self) -> RestResult<NewSubscription> {
+        Ok(NewSubscription {
+            name: self.name,
+            email: self.email,
+        })
     }
 }
 
-async fn insert_subscriber(pool: &PgPool, name: &str, email: &str) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        "insert into subscriptions(name, email) values ($1, $2)",
-        name,
-        email
-    )
-    .execute(pool)
-    .await?;
-    Ok(())
+#[post("")]
+async fn create(
+    pool: web::Data<PgPool>,
+    form: web::Form<NewSubscriptionForm>,
+) -> RestResult<impl Responder> {
+    let new_subscription: NewSubscription = form.0.try_into()?;
+
+    let _id = Subscription::insert(&pool, new_subscription)
+        .await
+        .map_err(|e| {
+            eprintln!("{:?}", e);
+            RestError::InternalServerError
+        })?;
+
+    Ok(HttpResponse::Created())
 }
 
 pub fn scope() -> impl HttpServiceFactory {
