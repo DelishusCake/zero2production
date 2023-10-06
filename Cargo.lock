@@ -2981,7 +2981,6 @@ dependencies = [
  "regex",
  "serde",
  "sqlx",
- "thiserror",
  "tracing",
  "tracing-log",
  "unicode-segmentation",

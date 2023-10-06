@@ -16,9 +16,9 @@ struct NewSubscriptionForm {
 }
 
 impl TryInto<NewSubscription> for NewSubscriptionForm {
-    type Error = RestError;
+    type Error = String;
 
-    fn try_into(self) -> RestResult<NewSubscription> {
+    fn try_into(self) -> Result<NewSubscription, Self::Error> {
         let name = self.name.parse()?;
         let email = self.email.parse()?;
 
@@ -32,14 +32,9 @@ async fn create(
     pool: web::Data<PgPool>,
     form: web::Form<NewSubscriptionForm>,
 ) -> RestResult<impl Responder> {
-    let new_subscription: NewSubscription = form.0.try_into()?;
+    let new_subscription: NewSubscription = form.0.try_into().map_err(RestError::ParseError)?;
 
-    let _id = Subscription::insert(&pool, new_subscription)
-        .await
-        .map_err(|e| {
-            tracing::error!("{:?}", e);
-            RestError::InternalServerError
-        })?;
+    let _id = Subscription::insert(&pool, new_subscription).await?;
 
     Ok(HttpResponse::Created())
 }

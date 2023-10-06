@@ -2,8 +2,6 @@ use std::str::FromStr;
 
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::Error;
-
 const MAX_LEN: usize = 256;
 
 #[derive(Debug)]
@@ -16,14 +14,14 @@ impl AsRef<str> for PersonName {
 }
 
 impl FromStr for PersonName {
-    type Err = Error;
+    type Err = String;
 
-    fn from_str(value: &str) -> Result<Self, crate::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         if value.trim().is_empty() {
-            return Err(Error::ParsingError("Name cannot be empty".into()));
+            return Err("Name cannot be empty".into());
         }
         if value.graphemes(true).count() > MAX_LEN {
-            return Err(Error::ParsingError("Name too long".into()));
+            return Err("Name too long".into());
         }
         Ok(Self(value.to_string()))
     }
