@@ -52,22 +52,34 @@ async fn subcribe_returns_bad_request_for_missing_data(pool: PgPool) -> sqlx::Re
     let app = TestApp::spawn(&pool).await;
 
     let test_cases: Vec<(String, NewSubscriber)> = vec![
-        ("Missing email".into(), NewSubscriber {
-            name: Some("Test name".into()),
-            email: None,
-        }),
-        ("Missing name".into(), NewSubscriber {
-            name: None,
-            email: Some("test@test.com".into()),
-        }),
-        ("Missing both email and name".into(), NewSubscriber {
-            name: None,
-            email: None,
-        }),
-        ("Malformed email".into(), NewSubscriber {
-            name: Some("Test name".into()),
-            email: Some("bad email address".into()),
-        }),
+        (
+            "Missing email".into(),
+            NewSubscriber {
+                name: Some("Test name".into()),
+                email: None,
+            },
+        ),
+        (
+            "Missing name".into(),
+            NewSubscriber {
+                name: None,
+                email: Some("test@test.com".into()),
+            },
+        ),
+        (
+            "Missing both email and name".into(),
+            NewSubscriber {
+                name: None,
+                email: None,
+            },
+        ),
+        (
+            "Malformed email".into(),
+            NewSubscriber {
+                name: Some("Test name".into()),
+                email: Some("bad email address".into()),
+            },
+        ),
     ];
 
     for (desc, new_subscriber) in test_cases {
@@ -76,7 +88,12 @@ async fn subcribe_returns_bad_request_for_missing_data(pool: PgPool) -> sqlx::Re
             .await
             .expect("Failed to execute request");
 
-        assert_eq!(StatusCode::BAD_REQUEST, res.status(), "API did not fail when payload was {}", desc);
+        assert_eq!(
+            StatusCode::BAD_REQUEST,
+            res.status(),
+            "API did not fail when payload was {}",
+            desc
+        );
     }
     Ok(())
 }

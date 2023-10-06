@@ -19,13 +19,10 @@ impl TryInto<NewSubscription> for NewSubscriptionForm {
     type Error = RestError;
 
     fn try_into(self) -> RestResult<NewSubscription> {
-        let name = self.name;
+        let name = self.name.parse()?;
         let email = self.email.parse()?;
 
-        Ok(NewSubscription {
-            name,
-            email,
-        })
+        Ok(NewSubscription { name, email })
     }
 }
 

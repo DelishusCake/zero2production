@@ -59,7 +59,11 @@ impl Settings {
         Config::builder()
             .add_source(File::from(base_path.join("base")).required(true))
             .add_source(File::from(base_path.join(runtime.as_str())).required(true))
-            .add_source(Environment::with_prefix("app").prefix_separator("_").separator("__"))
+            .add_source(
+                Environment::with_prefix("app")
+                    .prefix_separator("_")
+                    .separator("__"),
+            )
             .build()?
             .try_deserialize()
             .context("Failed to load/deserialize settings")

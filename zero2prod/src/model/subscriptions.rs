@@ -6,11 +6,11 @@ use serde::Serialize;
 
 use sqlx::PgPool;
 
-use crate::domain::EmailAddress;
+use crate::domain::{EmailAddress, PersonName};
 
 #[derive(Debug)]
 pub struct NewSubscription {
-    pub name: String,
+    pub name: PersonName,
     pub email: EmailAddress,
 }
 
@@ -30,7 +30,7 @@ impl Subscription {
     pub async fn insert(pool: &PgPool, new_subscriber: NewSubscription) -> sqlx::Result<Uuid> {
         let row = sqlx::query!(
             "insert into subscriptions(name, email) values ($1, $2) returning id",
-            new_subscriber.name,
+            new_subscriber.name.as_ref(),
             new_subscriber.email.as_ref(),
         )
         .fetch_one(pool)
