@@ -1,32 +1,31 @@
+use std::future::Future;
 use std::net::TcpListener;
 
-use actix_web::dev::Server;
-use actix_web::{get, HttpResponse, Responder};
-use actix_web::{web, App, HttpServer};
+use axum::routing::{get, post};
+use axum::{Router, Server};
 
 use sqlx::PgPool;
 
-use tracing_actix_web::TracingLogger;
+use tower_http::trace::TraceLayer;
+
+use crate::util;
 
 use crate::controller::subscriptions;
 
 #[tracing::instrument(name = "Health check")]
-#[get("/health_check")]
-async fn health_check() -> impl Responder {
-    HttpResponse::Ok()
+async fn health_check() -> &'static str {
+    "I am alive"
 }
 
-pub fn run(pool: PgPool, listener: TcpListener) -> std::io::Result<Server> {
-    let pool = web::Data::new(pool);
+pub fn run(pool: PgPool, listener: TcpListener) -> anyhow::Result<impl Future<Output=Result<(), hyper::Error>>> {
+    let app = Router::new()
+        .layer(TraceLayer::new_for_http())
+        .route("/health_check", get(health_check))
+        .route("/subscriptions", post(subscriptions::create))
+        .with_state(pool);
 
-    let server = HttpServer::new(move || {
-        App::new()
-            .wrap(TracingLogger::default())
-            .app_data(pool.clone())
-            .service(health_check)
-            .service(subscriptions::scope())
-    })
-    .listen(listener)?
-    .run();
+    let server = Server::from_tcp(listener)?
+        .serve(app.into_make_service())
+        .with_graceful_shutdown(util::shutdown_signal());
     Ok(server)
 }

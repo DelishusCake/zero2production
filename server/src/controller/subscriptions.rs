@@ -1,5 +1,6 @@
-use actix_web::dev::HttpServiceFactory;
-use actix_web::{post, web, HttpResponse, Responder};
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::Form;
 
 use serde::Deserialize;
 
@@ -10,7 +11,7 @@ use zero2prod::model::{NewSubscription, Subscription};
 use crate::error::{RestError, RestResult};
 
 #[derive(Debug, Deserialize)]
-struct NewSubscriptionForm {
+pub struct NewSubscriptionForm {
     name: String,
     email: String,
 }
@@ -27,18 +28,13 @@ impl TryInto<NewSubscription> for NewSubscriptionForm {
 }
 
 #[tracing::instrument(name = "Create a new subscriber", skip(pool))]
-#[post("")]
-async fn create(
-    pool: web::Data<PgPool>,
-    form: web::Form<NewSubscriptionForm>,
-) -> RestResult<impl Responder> {
-    let new_subscription: NewSubscription = form.0.try_into().map_err(RestError::ParseError)?;
+pub async fn create(
+    State(pool): State<PgPool>,
+    Form(form): Form<NewSubscriptionForm>,
+) -> RestResult<StatusCode> {
+    let new_subscription: NewSubscription = form.try_into().map_err(RestError::ParseError)?;
 
     let _id = Subscription::insert(&pool, new_subscription).await?;
 
-    Ok(HttpResponse::Created())
-}
-
-pub fn scope() -> impl HttpServiceFactory {
-    web::scope("/subscriptions").service(create)
+    Ok(StatusCode::CREATED)
 }

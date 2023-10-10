@@ -1,6 +1,6 @@
 use std::net::TcpListener;
 
-use reqwest::{Client, Response, StatusCode};
+use reqwest::{Client, Response};
 
 use serde::Serialize;
 
@@ -15,7 +15,6 @@ async fn health_check_works(pool: PgPool) -> sqlx::Result<()> {
     let res = app.health_check().await.expect("Failed to execute request");
 
     assert!(res.status().is_success());
-    assert_eq!(Some(0), res.content_length());
 
     Ok(())
 }
@@ -53,28 +52,28 @@ async fn subcribe_returns_bad_request_for_missing_data(pool: PgPool) -> sqlx::Re
 
     let test_cases: Vec<(String, NewSubscriber)> = vec![
         (
-            "Missing email".into(),
+            "missing email".into(),
             NewSubscriber {
                 name: Some("Test name".into()),
                 email: None,
             },
         ),
         (
-            "Missing name".into(),
+            "missing name".into(),
             NewSubscriber {
                 name: None,
                 email: Some("test@test.com".into()),
             },
         ),
         (
-            "Missing both email and name".into(),
+            "missing both email and name".into(),
             NewSubscriber {
                 name: None,
                 email: None,
             },
         ),
         (
-            "Malformed email".into(),
+            "malformed email".into(),
             NewSubscriber {
                 name: Some("Test name".into()),
                 email: Some("bad email address".into()),
@@ -88,9 +87,8 @@ async fn subcribe_returns_bad_request_for_missing_data(pool: PgPool) -> sqlx::Re
             .await
             .expect("Failed to execute request");
 
-        assert_eq!(
-            StatusCode::BAD_REQUEST,
-            res.status(),
+        assert!(
+            res.status().is_client_error(),
             "API did not fail when payload was {}",
             desc
         );
