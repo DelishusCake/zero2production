@@ -2,7 +2,7 @@
 set -x
 set -eo pipefail
 
-if ! [-x "$(command -v sqlx)"]; then
+if ! [ -x "$(command -v sqlx)" ]; then
   echo >&2 "ERROR: sqlx not installed"
   echo >&2 "Run:"
   echo >&2 "  cargo install sqlx-cli --no-default-features --features rustls,postgres"
