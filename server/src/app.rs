@@ -10,13 +10,13 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use crate::controller::subscriptions;
-use crate::crypto::Crypto;
+use crate::crypto::SigningKey;
 use crate::util;
 
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
-    pub crypto: Arc<Crypto>,
+    pub signing_key: Arc<SigningKey>,
 }
 
 #[tracing::instrument(name = "Health check")]
@@ -32,7 +32,10 @@ pub fn run(
         .layer(TraceLayer::new_for_http())
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscriptions::create))
-        .route("/subscriptions/confirm/:token_str", get(subscriptions::confirm))
+        .route(
+            "/subscriptions/confirm/:token_str",
+            get(subscriptions::confirm),
+        )
         .with_state(state);
 
     let server = Server::from_tcp(listener)?

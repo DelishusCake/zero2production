@@ -53,4 +53,14 @@ impl Subscription {
         .await?;
         Ok(())
     }
+
+    #[tracing::instrument(name = "Fetch all confirmed subscriptions", skip(pool))]
+    pub async fn fetch_all_confirmed(pool: &PgPool) -> sqlx::Result<Vec<Self>> {
+        sqlx::query_as!(
+            Self,
+            "select * from subscriptions where confirmed_at is not null"
+        )
+        .fetch_all(pool)
+        .await
+    }
 }

@@ -8,7 +8,7 @@ use serde::Serialize;
 use sqlx::PgPool;
 
 use server::app::{self, AppState};
-use server::crypto::Crypto;
+use server::crypto::SigningKey;
 
 #[sqlx::test(migrations = "../migrations")]
 async fn health_check_works(pool: PgPool) -> sqlx::Result<()> {
@@ -124,12 +124,12 @@ impl TestApp {
             .map(char::from)
             .collect();
 
-        let crypto = Crypto::new(&rand_key).expect("Failed to create crypto signing key");
-        let crypto = Arc::new(crypto);
+        let signing_key = SigningKey::new(&rand_key).expect("Failed to create crypto signing key");
+        let signing_key = Arc::new(signing_key);
 
         let state = AppState {
             pool: pool.clone(),
-            crypto,
+            signing_key,
         };
 
         let server = app::run(state, listener).expect("Failed to spawn app instance");
