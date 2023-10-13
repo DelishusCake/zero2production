@@ -9,6 +9,7 @@ use sqlx::PgPool;
 
 use tower_http::trace::TraceLayer;
 
+use crate::client::EmailClient;
 use crate::controller::subscriptions;
 use crate::crypto::SigningKey;
 use crate::util;
@@ -17,6 +18,7 @@ use crate::util;
 pub struct AppState {
     pub pool: PgPool,
     pub signing_key: Arc<SigningKey>,
+    pub email_client: Arc<EmailClient>,
 }
 
 #[tracing::instrument(name = "Health check")]
@@ -25,9 +27,17 @@ async fn health_check() -> &'static str {
 }
 
 pub fn run(
-    state: AppState,
+    pool: PgPool,
+    signing_key: SigningKey,
+    email_client: EmailClient,
     listener: TcpListener,
 ) -> anyhow::Result<impl Future<Output = Result<(), hyper::Error>>> {
+    let state = AppState {
+        pool,
+        signing_key: Arc::new(signing_key),
+        email_client: Arc::new(email_client),
+    };
+
     let app = Router::new()
         .layer(TraceLayer::new_for_http())
         .route("/health_check", get(health_check))

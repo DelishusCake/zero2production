@@ -1,17 +1,15 @@
 use std::net::TcpListener;
-use std::sync::Arc;
 
 use sqlx::PgPool;
 
-use server::app::{self, AppState};
+use server::app;
+use server::client::EmailClient;
 use server::crypto::SigningKey;
 use server::settings::Settings;
 use server::telemetry::{create_subscriber, set_subscriber};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    use secrecy::ExposeSecret;
-
     let subscriber = create_subscriber("debug".into(), std::io::stdout);
     set_subscriber(subscriber)?;
 
@@ -19,14 +17,18 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = PgPool::connect_lazy_with(settings.database.with_db());
 
-    let signing_key = SigningKey::new(settings.app.secret_key.expose_secret())?;
-    let signing_key = Arc::new(signing_key);
+    let signing_key = SigningKey::new(settings.app.secret_key())?;
 
-    let state = AppState { pool, signing_key };
+    let email_client = EmailClient::new(
+        settings.email.sender(),
+        settings.email.api_timeout(),
+        settings.email.api_base_url(),
+        settings.email.api_auth_token(),
+    )?;
 
     let listener = TcpListener::bind(settings.app.addr())?;
     tracing::info!("Running app on: {}", listener.local_addr()?);
 
-    app::run(state, listener)?.await?;
+    app::run(pool, signing_key, email_client, listener)?.await?;
     Ok(())
 }

@@ -2,14 +2,19 @@ use hmac::{Hmac, Mac};
 
 use sha2::Sha256;
 
+use secrecy::Secret;
+
 use jwt::{SigningAlgorithm, VerifyingAlgorithm};
 
 #[derive(Clone)]
 pub struct SigningKey(Hmac<Sha256>);
 
 impl SigningKey {
-    pub fn new(secret: &str) -> anyhow::Result<Self> {
-        let hmac = Hmac::new_from_slice(secret.as_bytes())?;
+    pub fn new(key: &Secret<String>) -> anyhow::Result<Self> {
+        use secrecy::ExposeSecret;
+
+        let hmac = Hmac::new_from_slice(key.expose_secret().as_bytes())?;
+
         Ok(Self(hmac))
     }
 }

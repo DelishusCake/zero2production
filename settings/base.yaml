@@ -1,2 +1,4 @@
 app:
   port: 8080
+email:
+  api_timeout_milliseconds: 10000 # 10 second timeout

@@ -1,5 +1,6 @@
 use std::env;
 use std::path::Path;
+use std::time::Duration;
 
 use anyhow::Context;
 
@@ -8,8 +9,15 @@ use config::{Config, Environment, File};
 use secrecy::Secret;
 
 use serde::Deserialize;
+use serde_aux::prelude::*;
 
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
+
+use url::Url;
+
+use zero2prod::domain::EmailAddress;
+
+use crate::client::EmailAuthorizationToken;
 
 #[derive(Debug)]
 pub enum Runtime {
@@ -42,6 +50,7 @@ impl TryFrom<String> for Runtime {
 pub struct Settings {
     pub app: ApplicationSettings,
     pub database: DatabaseSettings,
+    pub email: EmailSettings,
 }
 
 impl Settings {
@@ -72,25 +81,32 @@ impl Settings {
 
 #[derive(Debug, Deserialize)]
 pub struct ApplicationSettings {
-    pub host: String,
-    pub port: u16,
-    pub secret_key: Secret<String>,
+    host: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    port: u16,
+
+    secret_key: Secret<String>,
 }
 
 impl ApplicationSettings {
     pub fn addr(&self) -> (&str, u16) {
         (&self.host, self.port)
     }
+
+    pub fn secret_key(&self) -> &Secret<String> {
+        &self.secret_key
+    }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct DatabaseSettings {
-    pub port: u16,
-    pub host: String,
-    pub name: String,
-    pub username: String,
-    pub password: Secret<String>,
-    pub require_ssl: bool,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    port: u16,
+    host: String,
+    name: String,
+    username: String,
+    password: Secret<String>,
+    require_ssl: bool,
 }
 
 impl DatabaseSettings {
@@ -113,5 +129,34 @@ impl DatabaseSettings {
 
     pub fn with_db(&self) -> PgConnectOptions {
         self.without_db().database(&self.name)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EmailSettings {
+    sender: String,
+    api_base_url: String,
+    api_auth_token: Secret<String>,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    api_timeout_milliseconds: u64,
+}
+
+impl EmailSettings {
+    pub fn sender(&self) -> EmailAddress {
+        self.sender
+            .parse()
+            .expect("Failed to parse email sender address")
+    }
+
+    pub fn api_timeout(&self) -> Duration {
+        Duration::from_millis(self.api_timeout_milliseconds)
+    }
+
+    pub fn api_base_url(&self) -> Url {
+        Url::parse(&self.api_base_url).expect("Failed to parse email base URL")
+    }
+
+    pub fn api_auth_token(&self) -> EmailAuthorizationToken {
+        self.api_auth_token.clone().into()
     }
 }

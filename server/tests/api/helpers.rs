@@ -1,0 +1,88 @@
+use std::net::TcpListener;
+use std::time::Duration;
+
+use reqwest::{Client, Response};
+
+use sqlx::PgPool;
+
+use secrecy::Secret;
+
+use serde::Serialize;
+
+use url::Url;
+
+use server::app;
+use server::client::EmailClient;
+use server::crypto::SigningKey;
+
+#[derive(Debug, Serialize)]
+pub struct NewSubscriber {
+    pub name: Option<String>,
+    pub email: Option<String>,
+}
+
+pub struct TestApp {
+    addr: String,
+    client: Client,
+}
+
+impl TestApp {
+    pub async fn spawn(pool: &PgPool) -> Self {
+        use rand::{distributions::Alphanumeric, Rng};
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to listen on random port");
+        let port = listener.local_addr().unwrap().port();
+
+        let addr = format!("http://127.0.0.1:{}", port);
+
+        let signing_key = {
+            let rand_key: String = rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(7)
+                .map(char::from)
+                .collect();
+
+            SigningKey::new(&Secret::new(rand_key)).expect("Failed to create crypto signing key")
+        };
+
+        let email_client = {
+            let sender = "test@test.com"
+                .parse()
+                .expect("Failed to parse sender email address");
+            let api_base_url = Url::parse(&addr).expect("Failed to parse binding address");
+            let api_auth_token = "TestAuthorization"
+                .parse()
+                .expect("Failed to parse authorization token");
+            let api_timeout = Duration::from_secs(2);
+
+            EmailClient::new(sender, api_timeout, api_base_url, api_auth_token)
+                .expect("Failed to create email client")
+        };
+
+        let server = app::run(pool.clone(), signing_key, email_client, listener)
+            .expect("Failed to spawn app instance");
+        let _ = tokio::spawn(server);
+
+        let client = Client::new();
+
+        Self { addr, client }
+    }
+
+    pub async fn health_check(&self) -> reqwest::Result<Response> {
+        self.client
+            .get(format!("{}/health_check", &self.addr))
+            .send()
+            .await
+    }
+
+    pub async fn subscription_create(
+        &self,
+        new_subscriber: &NewSubscriber,
+    ) -> reqwest::Result<Response> {
+        self.client
+            .post(format!("{}/subscriptions", &self.addr))
+            .form(new_subscriber)
+            .send()
+            .await
+    }
+}
