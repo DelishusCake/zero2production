@@ -74,6 +74,7 @@ impl Settings {
 pub struct ApplicationSettings {
     pub host: String,
     pub port: u16,
+    pub secret_key: Secret<String>,
 }
 
 impl ApplicationSettings {

@@ -18,6 +18,12 @@ zero2prod = { path = "../zero2prod" }
 anyhow = "1.0"
 thiserror = "1.0"
 
+jwt = "0.16"
+hmac = "0.12"
+sha2 = "0.10"
+
+uuid = "1.4"
+
 config = "0.13"
 
 reqwest = "0.11"
@@ -28,7 +34,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde-aux = "4.2"
 
-axum = "0.6"
+axum = { version = "0.6", features = ["macros"] }
 hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.4"
@@ -49,3 +55,6 @@ features = [
 	"chrono",
 	"migrate"
 ]
+
+[dev-dependencies]
+rand = "0.8"

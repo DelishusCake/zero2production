@@ -13,7 +13,7 @@ where
 {
     fmt::fmt()
         .with_env_filter(EnvFilter::new(env_filter))
-        .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
+        .with_span_events(FmtSpan::ACTIVE)
         .with_writer(sink)
         .finish()
 }

@@ -1,5 +1,6 @@
 app:
   host: localhost
+  secret_key: 2Jn0DSFN6VBP6hYjA5Xnu92YweMCHDoN
 database:
   name: newsletter
   host: localhost

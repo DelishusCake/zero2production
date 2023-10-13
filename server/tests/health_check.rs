@@ -1,4 +1,5 @@
 use std::net::TcpListener;
+use std::sync::Arc;
 
 use reqwest::{Client, Response};
 
@@ -6,7 +7,8 @@ use serde::Serialize;
 
 use sqlx::PgPool;
 
-use server::app;
+use server::app::{self, AppState};
+use server::crypto::Crypto;
 
 #[sqlx::test(migrations = "../migrations")]
 async fn health_check_works(pool: PgPool) -> sqlx::Result<()> {
@@ -109,12 +111,28 @@ struct TestApp {
 
 impl TestApp {
     pub async fn spawn(pool: &PgPool) -> Self {
+        use rand::{distributions::Alphanumeric, Rng};
+
         let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to listen on random port");
         let port = listener.local_addr().unwrap().port();
 
         let addr = format!("http://127.0.0.1:{}", port);
 
-        let server = app::run(pool.clone(), listener).expect("Failed to spawn app instance");
+        let rand_key: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(7)
+            .map(char::from)
+            .collect();
+
+        let crypto = Crypto::new(&rand_key).expect("Failed to create crypto signing key");
+        let crypto = Arc::new(crypto);
+
+        let state = AppState {
+            pool: pool.clone(),
+            crypto,
+        };
+
+        let server = app::run(state, listener).expect("Failed to spawn app instance");
         let _ = tokio::spawn(server);
 
         let client = Client::new();

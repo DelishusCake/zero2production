@@ -14,6 +14,8 @@ create table if not exists subscriptions(
 	name  text not null,
 	email text not null unique,
 
+	confirmed_at timestamptz default null,
+
 	created_at timestamptz not null default now(),
 	updated_at timestamptz not null default now()
 );
