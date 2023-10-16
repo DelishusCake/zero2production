@@ -6,7 +6,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 const MAX_LEN: usize = 256;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EmailAddress(String);
 
 impl AsRef<str> for EmailAddress {

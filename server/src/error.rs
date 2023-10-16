@@ -15,11 +15,14 @@ pub enum RestError {
     #[error("Invalid Confirmation Token")]
     InvalidConfirmationToken,
 
+    #[error("Failed to Sign Token")]
+    FailedToSignToken,
+
+    #[error("Failed to Send Email")]
+    FailedToSendEmail,
+
     #[error("Internal Server Error")]
     DatabaseError(#[from] sqlx::Error),
-
-    #[error("Failed to sign token")]
-    FailedToSignToken,
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
@@ -30,9 +33,10 @@ impl RestError {
         match self {
             Self::ParseError(_) => StatusCode::BAD_REQUEST,
             Self::InvalidConfirmationToken => StatusCode::UNAUTHORIZED,
-            Self::DatabaseError(_) | Self::FailedToSignToken | Self::Other(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            Self::DatabaseError(_)
+            | Self::FailedToSignToken
+            | Self::FailedToSendEmail
+            | Self::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

@@ -2,7 +2,7 @@ use std::future::Future;
 use std::net::TcpListener;
 use std::sync::Arc;
 
-use axum::routing::{get, post};
+use axum::routing::get;
 use axum::{Router, Server};
 
 use sqlx::PgPool;
@@ -41,11 +41,7 @@ pub fn run(
     let app = Router::new()
         .layer(TraceLayer::new_for_http())
         .route("/health_check", get(health_check))
-        .route("/subscriptions", post(subscriptions::create))
-        .route(
-            "/subscriptions/confirm/:token_str",
-            get(subscriptions::confirm),
-        )
+        .nest("/subscriptions", subscriptions::routes())
         .with_state(state);
 
     let server = Server::from_tcp(listener)?

@@ -1,10 +1,18 @@
 use sqlx::PgPool;
 
+use wiremock::matchers::*;
+use wiremock::{Mock, ResponseTemplate};
+
 use crate::helpers::{NewSubscriber, TestApp};
 
 #[sqlx::test(migrations = "../migrations")]
 async fn subcribe_returns_success_for_valid_request(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
+
+    Mock::given(any())
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
 
     let new_subscriber = NewSubscriber {
         name: Some("Test Subscrber".into()),
@@ -76,5 +84,73 @@ async fn subcribe_returns_bad_request_for_missing_data(pool: PgPool) -> sqlx::Re
             desc
         );
     }
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn subcribe_sends_a_confirmation_email_for_valid_request(pool: PgPool) -> sqlx::Result<()> {
+    let app = TestApp::spawn(&pool).await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let new_subscriber = NewSubscriber {
+        name: Some("Test Subscrber".into()),
+        email: Some("test@test.com".into()),
+    };
+
+    let res = app
+        .subscription_create(&new_subscriber)
+        .await
+        .expect("Failed to execute request");
+
+    assert!(res.status().is_success());
+
+    Ok(())
+}
+
+
+#[sqlx::test(migrations = "../migrations")]
+async fn subcribe_sends_a_confirmation_email_with_link(pool: PgPool) -> sqlx::Result<()> {
+    let app = TestApp::spawn(&pool).await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let new_subscriber = NewSubscriber {
+        name: Some("Test Subscrber".into()),
+        email: Some("test@test.com".into()),
+    };
+
+    let _res = app
+        .subscription_create(&new_subscriber)
+        .await
+        .expect("Failed to execute request");
+
+    let get_link = |s: &str| {
+        let links: Vec<_> = linkify::LinkFinder::new()
+            .links(s)
+            .filter(|l| *l.kind() == linkify::LinkKind::Url)
+            .collect();
+        assert_eq!(1, links.len());
+        links[0].as_str().to_string()
+    };
+
+    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+
+    let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
+    let html_link = get_link(&body["HtmlBody"].as_str().unwrap());
+    let text_link = get_link(&body["TextBody"].as_str().unwrap());
+
+    assert_eq!(html_link, text_link);
+
     Ok(())
 }

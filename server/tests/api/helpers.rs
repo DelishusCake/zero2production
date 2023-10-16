@@ -11,6 +11,8 @@ use serde::Serialize;
 
 use url::Url;
 
+use wiremock::MockServer;
+
 use server::app;
 use server::client::EmailClient;
 use server::crypto::SigningKey;
@@ -24,6 +26,8 @@ pub struct NewSubscriber {
 pub struct TestApp {
     addr: String,
     client: Client,
+
+    pub email_server: MockServer,
 }
 
 impl TestApp {
@@ -45,11 +49,14 @@ impl TestApp {
             SigningKey::new(&Secret::new(rand_key)).expect("Failed to create crypto signing key")
         };
 
+        let email_server = MockServer::start().await;
+
         let email_client = {
             let sender = "test@test.com"
                 .parse()
                 .expect("Failed to parse sender email address");
-            let api_base_url = Url::parse(&addr).expect("Failed to parse binding address");
+            let api_base_url =
+                Url::parse(&email_server.uri()).expect("Failed to parse mock server uri");
             let api_auth_token = "TestAuthorization"
                 .parse()
                 .expect("Failed to parse authorization token");
@@ -65,7 +72,11 @@ impl TestApp {
 
         let client = Client::new();
 
-        Self { addr, client }
+        Self {
+            addr,
+            client,
+            email_server,
+        }
     }
 
     pub async fn health_check(&self) -> reqwest::Result<Response> {

@@ -68,4 +68,5 @@ features = [
 rand = "0.8"
 fake = "~2.3"
 claims = "0.7"
+linkify = "0.9"
 wiremock = "0.5"

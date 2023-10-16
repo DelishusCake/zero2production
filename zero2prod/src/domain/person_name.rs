@@ -5,7 +5,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 const MAX_LEN: usize = 256;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PersonName(String);
 
 impl AsRef<str> for PersonName {
