@@ -1,17 +1,16 @@
-use axum::extract::{Form, Path, State};
-use axum::http::StatusCode;
-use axum::routing::{get, post};
-use axum::Router;
+use actix_web::dev::HttpServiceFactory;
+use actix_web::{post, get, web, HttpResponse, Responder};
 
 use jwt::{SignWithKey, VerifyWithKey};
 
 use serde::{Deserialize, Serialize};
 
+use sqlx::PgPool;
+
 use uuid::Uuid;
 
 use zero2prod::model::{NewSubscription, Subscription};
 
-use crate::app::AppState;
 use crate::client::EmailClient;
 use crate::crypto::SigningKey;
 use crate::error::{RestError, RestResult};
@@ -42,21 +41,18 @@ impl From<Confirmation> for Uuid {
     }
 }
 
-#[axum::debug_handler]
 #[tracing::instrument(
     name = "Create a new subscriber",
     skip(pool, signing_key, email_client)
 )]
+#[post("")]
 async fn create(
-    State(AppState {
-        pool,
-        signing_key,
-        email_client,
-        ..
-    }): State<AppState>,
-    Form(form): Form<NewSubscriptionForm>,
-) -> RestResult<StatusCode> {
-    let new_subscription: NewSubscription = form.try_into().map_err(RestError::ParseError)?;
+    pool: web::Data<PgPool>,
+    signing_key: web::Data<SigningKey>,
+    email_client: web::Data<EmailClient>,
+    form: web::Form<NewSubscriptionForm>,
+) -> RestResult<impl Responder> {
+    let new_subscription: NewSubscription = form.0.try_into().map_err(RestError::ParseError)?;
 
     // Transaction context
     {
@@ -72,24 +68,26 @@ async fn create(
         tx.commit().await?;
     }
 
-    Ok(StatusCode::CREATED)
+    Ok(HttpResponse::Created())
 }
 
-#[axum::debug_handler]
+
 #[tracing::instrument(name = "Confirm a subscription by token", skip(pool, signing_key))]
+#[get("/confirm/{token_str}")]
 async fn confirm(
-    State(AppState {
-        pool, signing_key, ..
-    }): State<AppState>,
-    Path(token_str): Path<String>,
-) -> RestResult<StatusCode> {
+    pool: web::Data<PgPool>,
+    signing_key: web::Data<SigningKey>,
+    path: web::Path<(String, )>,
+) -> RestResult<impl Responder> {
+    let (token_str, ) = path.into_inner();
+
     let confirmation: Confirmation = token_str
         .verify_with_key(signing_key.as_ref())
         .map_err(|_| RestError::InvalidConfirmationToken)?;
 
-    Subscription::confirm_by_id(&pool, confirmation.into()).await?;
+    Subscription::confirm_by_id(&**pool, confirmation.into()).await?;
 
-    Ok(StatusCode::OK)
+    Ok(HttpResponse::Ok())
 }
 
 async fn send_confirmation_email(
@@ -124,8 +122,8 @@ async fn send_confirmation_email(
     Ok(())
 }
 
-pub fn routes() -> Router<AppState> {
-    Router::new()
-        .route("/", post(create))
-        .route("/confirm/:token_str", get(confirm))
+pub fn scope() -> impl HttpServiceFactory {
+    web::scope("/subscriptions")
+        .service(create)
+        .service(confirm)
 }

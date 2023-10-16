@@ -1,7 +1,6 @@
-use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
+use actix_web::http::StatusCode;
+use actix_web::ResponseError;
+
 use thiserror::Error;
 
 pub type RestResult<T> = Result<T, RestError>;
@@ -28,8 +27,8 @@ pub enum RestError {
     Other(#[from] anyhow::Error),
 }
 
-impl RestError {
-    pub fn status_code(&self) -> StatusCode {
+impl ResponseError for RestError {
+    fn status_code(&self) -> StatusCode {
         match self {
             Self::ParseError(_) => StatusCode::BAD_REQUEST,
             Self::InvalidConfirmationToken => StatusCode::UNAUTHORIZED,
@@ -38,14 +37,5 @@ impl RestError {
             | Self::FailedToSendEmail
             | Self::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
-    }
-}
-
-impl IntoResponse for RestError {
-    fn into_response(self) -> Response {
-        let body = format!("{}", self);
-        let status_code = self.status_code();
-
-        (status_code, body).into_response()
     }
 }

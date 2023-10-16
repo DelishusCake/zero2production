@@ -1,29 +1,21 @@
-use std::future::Future;
 use std::net::TcpListener;
-use std::sync::Arc;
 
-use axum::routing::get;
-use axum::{Router, Server};
+use actix_web::dev::Server;
+use actix_web::{get, HttpResponse, Responder};
+use actix_web::{web, App, HttpServer};
 
 use sqlx::PgPool;
 
-use tower_http::trace::TraceLayer;
+use tracing_actix_web::TracingLogger;
 
 use crate::client::EmailClient;
 use crate::controller::subscriptions;
 use crate::crypto::SigningKey;
-use crate::util;
-
-#[derive(Clone)]
-pub struct AppState {
-    pub pool: PgPool,
-    pub signing_key: Arc<SigningKey>,
-    pub email_client: Arc<EmailClient>,
-}
 
 #[tracing::instrument(name = "Health check")]
-async fn health_check() -> &'static str {
-    "I am alive"
+#[get("/health_check")]
+async fn health_check() -> impl Responder {
+    HttpResponse::Ok().body("I am alive")
 }
 
 pub fn run(
@@ -31,21 +23,22 @@ pub fn run(
     signing_key: SigningKey,
     email_client: EmailClient,
     listener: TcpListener,
-) -> anyhow::Result<impl Future<Output = Result<(), hyper::Error>>> {
-    let state = AppState {
-        pool,
-        signing_key: Arc::new(signing_key),
-        email_client: Arc::new(email_client),
-    };
+) -> anyhow::Result<Server> {
+    let pool = web::Data::new(pool);
+    let signing_key = web::Data::new(signing_key);
+    let email_client = web::Data::new(email_client);
 
-    let app = Router::new()
-        .layer(TraceLayer::new_for_http())
-        .route("/health_check", get(health_check))
-        .nest("/subscriptions", subscriptions::routes())
-        .with_state(state);
+    let server = HttpServer::new(move || {
+        App::new()
+            .wrap(TracingLogger::default())
+            .app_data(pool.clone())
+            .app_data(signing_key.clone())
+            .app_data(email_client.clone())
+            .service(health_check)
+            .service(subscriptions::scope())
+    })
+    .listen(listener)?
+    .run();
 
-    let server = Server::from_tcp(listener)?
-        .serve(app.into_make_service())
-        .with_graceful_shutdown(util::shutdown_signal());
     Ok(server)
 }
