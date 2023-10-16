@@ -1,3 +1,5 @@
+use reqwest::StatusCode;
+
 use sqlx::PgPool;
 
 use wiremock::matchers::*;
@@ -113,7 +115,6 @@ async fn subcribe_sends_a_confirmation_email_for_valid_request(pool: PgPool) -> 
     Ok(())
 }
 
-
 #[sqlx::test(migrations = "../migrations")]
 async fn subcribe_sends_a_confirmation_email_with_link(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
@@ -151,6 +152,73 @@ async fn subcribe_sends_a_confirmation_email_with_link(pool: PgPool) -> sqlx::Re
     let text_link = get_link(&body["TextBody"].as_str().unwrap());
 
     assert_eq!(html_link, text_link);
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn subscription_can_be_confirmed(pool: PgPool) -> sqlx::Result<()> {
+    let app = TestApp::spawn(&pool).await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let new_subscriber = NewSubscriber {
+        name: Some("Test Subscrber".into()),
+        email: Some("test@test.com".into()),
+    };
+
+    let _res = app
+        .subscription_create(&new_subscriber)
+        .await
+        .expect("Failed to execute request");
+
+    let subscription = sqlx::query!(
+        "select confirmed_at from subscriptions where email=$1",
+        new_subscriber.email.clone().unwrap()
+    )
+    .fetch_one(&pool)
+    .await
+    .expect("Failed to fetch updated row");
+
+    assert!(subscription.confirmed_at.is_none());
+
+    let get_link = |s: &str| {
+        let links: Vec<_> = linkify::LinkFinder::new()
+            .links(s)
+            .filter(|l| *l.kind() == linkify::LinkKind::Url)
+            .collect();
+        assert_eq!(1, links.len());
+        links[0].as_str().to_string()
+    };
+
+    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+
+    let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
+    let link = get_link(&body["HtmlBody"].as_str().unwrap());
+
+    let res = app
+        .client
+        .get(&link)
+        .send()
+        .await
+        .expect("Failed to follow confirmation link");
+
+    assert_eq!(StatusCode::OK, res.status());
+
+    let subscription = sqlx::query!(
+        "select confirmed_at from subscriptions where email=$1",
+        new_subscriber.email.clone().unwrap()
+    )
+    .fetch_one(&pool)
+    .await
+    .expect("Failed to fetch updated row");
+
+    assert!(subscription.confirmed_at.is_some());
 
     Ok(())
 }

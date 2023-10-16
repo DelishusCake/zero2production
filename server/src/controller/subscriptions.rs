@@ -1,17 +1,18 @@
 use actix_web::dev::HttpServiceFactory;
-use actix_web::{post, get, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 
 use jwt::{SignWithKey, VerifyWithKey};
 
 use serde::{Deserialize, Serialize};
 
 use sqlx::PgPool;
+use url::Url;
 
 use uuid::Uuid;
 
 use zero2prod::model::{NewSubscription, Subscription};
 
-use crate::client::EmailClient;
+use crate::client::{Email, EmailClient};
 use crate::crypto::SigningKey;
 use crate::error::{RestError, RestResult};
 
@@ -43,10 +44,11 @@ impl From<Confirmation> for Uuid {
 
 #[tracing::instrument(
     name = "Create a new subscriber",
-    skip(pool, signing_key, email_client)
+    skip(req, pool, signing_key, email_client)
 )]
 #[post("")]
 async fn create(
+    req: HttpRequest,
     pool: web::Data<PgPool>,
     signing_key: web::Data<SigningKey>,
     email_client: web::Data<EmailClient>,
@@ -62,8 +64,15 @@ async fn create(
 
         let confirmation = Confirmation(id);
 
-        send_confirmation_email(&email_client, &signing_key, &new_subscription, confirmation)
-            .await?;
+        let confirmation_url = build_confirmation_url(confirmation, &signing_key, &req)?;
+
+        email_client
+            .send(build_confirmation_email(
+                &new_subscription,
+                confirmation_url,
+            ))
+            .await
+            .map_err(|_| RestError::FailedToSendEmail)?;
 
         tx.commit().await?;
     }
@@ -71,15 +80,14 @@ async fn create(
     Ok(HttpResponse::Created())
 }
 
-
 #[tracing::instrument(name = "Confirm a subscription by token", skip(pool, signing_key))]
-#[get("/confirm/{token_str}")]
+#[get("/confirm/{token_str}", name = "confirm_subscription")]
 async fn confirm(
     pool: web::Data<PgPool>,
     signing_key: web::Data<SigningKey>,
-    path: web::Path<(String, )>,
+    path: web::Path<(String,)>,
 ) -> RestResult<impl Responder> {
-    let (token_str, ) = path.into_inner();
+    let (token_str,) = path.into_inner();
 
     let confirmation: Confirmation = token_str
         .verify_with_key(signing_key.as_ref())
@@ -90,23 +98,24 @@ async fn confirm(
     Ok(HttpResponse::Ok())
 }
 
-async fn send_confirmation_email(
-    email_client: &EmailClient,
-    signing_key: &SigningKey,
-    subscription: &NewSubscription,
+fn build_confirmation_url(
     confirmation: Confirmation,
-) -> RestResult<()> {
-    let confirmation_token = confirmation
+    signing_key: &SigningKey,
+    req: &HttpRequest,
+) -> RestResult<Url> {
+    let token = confirmation
         .sign_with_key(signing_key)
         .map_err(|_| RestError::FailedToSignToken)?;
 
-    tracing::debug!("Confirmation Token: {:?}", confirmation_token);
+    let url = req
+        .url_for("confirm_subscription", [&token])
+        .map_err(|_| RestError::FailedToSignToken)?;
 
-    let confirmation_url = format!(
-        "http://localhost/subscriptions/confirm/{}",
-        confirmation_token
-    );
+    Ok(url)
+}
 
+fn build_confirmation_email(subscription: &NewSubscription, confirmation_url: Url) -> Email {
+    let recipient = subscription.email.clone();
     let subject = format!("Welcome {}!", subscription.name.as_ref());
     let html_body = format!("<h1>Welcome to our newsletter!</h1><p>Click <a href=\"{}\">here</a> to confirm your subscription.</p>", confirmation_url);
     let text_body = format!(
@@ -114,12 +123,12 @@ async fn send_confirmation_email(
         confirmation_url
     );
 
-    email_client
-        .send(subscription.email.clone(), &subject, &html_body, &text_body)
-        .await
-        .map_err(|_| RestError::FailedToSendEmail)?;
-
-    Ok(())
+    Email {
+        recipient,
+        subject,
+        html_body,
+        text_body,
+    }
 }
 
 pub fn scope() -> impl HttpServiceFactory {

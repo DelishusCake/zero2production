@@ -1,7 +1,7 @@
 use std::net::TcpListener;
 use std::time::Duration;
 
-use reqwest::{Client, Response};
+use reqwest::{Client, Method, Response};
 
 use sqlx::PgPool;
 
@@ -25,8 +25,8 @@ pub struct NewSubscriber {
 
 pub struct TestApp {
     addr: String,
-    client: Client,
 
+    pub client: Client,
     pub email_server: MockServer,
 }
 
@@ -79,19 +79,20 @@ impl TestApp {
         }
     }
 
-    pub async fn health_check(&self) -> reqwest::Result<Response> {
+    pub fn request(&self, method: Method, url: &str) -> reqwest::RequestBuilder {
         self.client
-            .get(format!("{}/health_check", &self.addr))
-            .send()
-            .await
+            .request(method, format!("{}/{}", &self.addr, url))
+    }
+
+    pub async fn health_check(&self) -> reqwest::Result<Response> {
+        self.request(Method::GET, "health_check").send().await
     }
 
     pub async fn subscription_create(
         &self,
         new_subscriber: &NewSubscriber,
     ) -> reqwest::Result<Response> {
-        self.client
-            .post(format!("{}/subscriptions", &self.addr))
+        self.request(Method::POST, "subscriptions")
             .form(new_subscriber)
             .send()
             .await

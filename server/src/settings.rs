@@ -17,8 +17,6 @@ use url::Url;
 
 use zero2prod::domain::EmailAddress;
 
-use crate::client::EmailAuthorizationToken;
-
 #[derive(Debug)]
 pub enum Runtime {
     Dev,
@@ -156,7 +154,7 @@ impl EmailSettings {
         Url::parse(&self.api_base_url).expect("Failed to parse email base URL")
     }
 
-    pub fn api_auth_token(&self) -> EmailAuthorizationToken {
-        self.api_auth_token.clone().into()
+    pub fn api_auth_token(&self) -> Secret<String> {
+        self.api_auth_token.clone()
     }
 }

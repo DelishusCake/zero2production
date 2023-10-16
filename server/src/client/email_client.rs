@@ -1,8 +1,4 @@
-use std::convert::Infallible;
-use std::str::FromStr;
 use std::time::Duration;
-
-use anyhow::Context;
 
 use reqwest::Client;
 
@@ -22,7 +18,7 @@ pub struct EmailClient {
     sender: EmailAddress,
 
     api_send_email_url: Url,
-    api_auth_token: EmailAuthorizationToken,
+    api_auth_token: Secret<String>,
 }
 
 impl EmailClient {
@@ -30,16 +26,11 @@ impl EmailClient {
         sender: EmailAddress,
         api_timeout: Duration,
         api_base_url: Url,
-        api_auth_token: EmailAuthorizationToken,
+        api_auth_token: Secret<String>,
     ) -> anyhow::Result<Self> {
-        let client = Client::builder()
-            .timeout(api_timeout)
-            .build()
-            .context("Failed to build http client")?;
+        let client = Client::builder().timeout(api_timeout).build()?;
 
-        let api_send_email_url = api_base_url
-            .join("email")
-            .context("Failed to create send email endpoint URL")?;
+        let api_send_email_url = api_base_url.join("email")?;
 
         Ok(Self {
             client,
@@ -49,22 +40,11 @@ impl EmailClient {
         })
     }
 
-    pub async fn send(
-        &self,
-        recipient: EmailAddress,
-        subject: &str,
-        html_body: &str,
-        text_body: &str,
-    ) -> anyhow::Result<()> {
+    #[tracing::instrument(name = "Send an email via API")]
+    pub async fn send(&self, email: Email) -> anyhow::Result<()> {
         use secrecy::ExposeSecret;
 
-        let body = SendEmailRequest {
-            to: recipient.as_ref(),
-            from: self.sender.as_ref(),
-            subject,
-            html_body,
-            text_body,
-        };
+        let body = email.as_request(&self.sender);
 
         self.client
             .post(self.api_send_email_url.clone())
@@ -78,28 +58,22 @@ impl EmailClient {
 }
 
 #[derive(Debug)]
-pub struct EmailAuthorizationToken(Secret<String>);
-
-impl FromStr for EmailAuthorizationToken {
-    type Err = Infallible;
-
-    fn from_str(value: &str) -> Result<Self, Infallible> {
-        let value = value.to_string();
-        let value = Secret::new(value);
-
-        Ok(Self(value))
-    }
+pub struct Email {
+    pub recipient: EmailAddress,
+    pub subject: String,
+    pub html_body: String,
+    pub text_body: String,
 }
 
-impl From<Secret<String>> for EmailAuthorizationToken {
-    fn from(value: Secret<String>) -> Self {
-        Self(value)
-    }
-}
-
-impl secrecy::ExposeSecret<String> for EmailAuthorizationToken {
-    fn expose_secret(&self) -> &String {
-        self.0.expose_secret()
+impl Email {
+    fn as_request<'e>(&'e self, sender: &'e EmailAddress) -> SendEmailRequest<'e> {
+        SendEmailRequest {
+            to: self.recipient.as_ref(),
+            from: sender.as_ref(),
+            subject: &self.subject,
+            html_body: &self.html_body,
+            text_body: &self.text_body,
+        }
     }
 }
 
@@ -158,13 +132,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let recipient = fake_email();
-        let subject: String = Sentence(1..2).fake();
-        let content: String = Paragraph(1..2).fake();
-
-        let res = client.send(recipient, &subject, &content, &content).await;
-
-        assert_ok!(res);
+        assert_ok!(client.send(fake_email()).await);
     }
 
     #[tokio::test]
@@ -178,13 +146,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let recipient = fake_email();
-        let subject: String = Sentence(1..2).fake();
-        let content: String = Paragraph(1..2).fake();
-
-        let res = client.send(recipient, &subject, &content, &content).await;
-
-        assert_err!(res);
+        assert_err!(client.send(fake_email()).await);
     }
 
     #[tokio::test]
@@ -198,24 +160,31 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let recipient = fake_email();
-        let subject: String = Sentence(1..2).fake();
-        let content: String = Paragraph(1..2).fake();
-
-        let res = client.send(recipient, &subject, &content, &content).await;
-
-        assert_err!(res);
+        assert_err!(client.send(fake_email()).await);
     }
 
-    fn fake_email() -> EmailAddress {
+    fn fake_email_address() -> EmailAddress {
         SafeEmail().fake::<String>().parse().unwrap()
     }
 
+    fn fake_email() -> Email {
+        let recipient = fake_email_address();
+        let subject: String = Sentence(1..2).fake();
+        let content: String = Paragraph(1..2).fake();
+
+        Email {
+            recipient,
+            subject,
+            html_body: content.clone(),
+            text_body: content.clone(),
+        }
+    }
+
     fn email_client(server_uri: &str) -> EmailClient {
-        let sender = fake_email();
+        let sender = fake_email_address();
         let mock_api_timeout = Duration::from_secs(2);
         let mock_api_url = Url::parse(server_uri).unwrap();
-        let mock_api_auth: EmailAuthorizationToken = Faker.fake::<String>().parse().unwrap();
+        let mock_api_auth: Secret<String> = Faker.fake::<String>().parse().unwrap();
 
         EmailClient::new(sender, mock_api_timeout, mock_api_url, mock_api_auth).unwrap()
     }
