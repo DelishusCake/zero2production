@@ -4,6 +4,8 @@ use regex::Regex;
 
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::error::{Result, Error};
+
 const MAX_LEN: usize = 256;
 
 #[derive(Debug, Clone)]
@@ -16,21 +18,21 @@ impl AsRef<str> for EmailAddress {
 }
 
 impl FromStr for EmailAddress {
-    type Err = String;
+    type Err = Error;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         lazy_static::lazy_static! {
             static ref EMAIL_REGEX: Regex = Regex::new(r"^\w+@\w+\.\w+$").unwrap();
         }
 
         if value.trim().is_empty() {
-            return Err("Email address cannot be empty".into());
+            return Err(Error::ParsingError("Email address cannot be empty".into()));
         }
         if value.graphemes(true).count() > MAX_LEN {
-            return Err("Email address too long".into());
+            return Err(Error::ParsingError("Email address too long".into()));
         }
         if !EMAIL_REGEX.is_match(value) {
-            return Err("Email address of incorrect format".into());
+            return Err(Error::ParsingError("Email address of incorrect format".into()));
         }
 
         // Normalize

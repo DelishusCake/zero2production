@@ -2,9 +2,10 @@ use std::net::TcpListener;
 
 use sqlx::PgPool;
 
+use zero2prod::client::EmailClient;
+use zero2prod::crypto::SigningKey;
+
 use server::app;
-use server::client::EmailClient;
-use server::crypto::SigningKey;
 use server::settings::Settings;
 use server::telemetry::{create_subscriber, set_subscriber};
 

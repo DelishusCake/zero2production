@@ -3,6 +3,8 @@ use std::str::FromStr;
 
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::error::{Result, Error};
+
 const MAX_LEN: usize = 256;
 
 #[derive(Debug, Clone)]
@@ -15,9 +17,9 @@ impl AsRef<str> for PersonName {
 }
 
 impl FromStr for PersonName {
-    type Err = String;
+    type Err = Error;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         lazy_static::lazy_static! {
             static ref INVALID_CHARS: HashSet<char> = vec!['/', '(', ')', '"', '<', '>', '\\', '{', '}']
                 .into_iter()
@@ -25,13 +27,13 @@ impl FromStr for PersonName {
         }
 
         if value.trim().is_empty() {
-            return Err("Name cannot be empty".into());
+            return Err(Error::ParsingError("Name cannot be empty".into()));
         }
         if value.graphemes(true).count() > MAX_LEN {
-            return Err("Name too long".into());
+            return Err(Error::ParsingError("Name too long".into()));
         }
         if value.chars().any(|c| INVALID_CHARS.contains(&c)) {
-            return Err("Name contains invalid characters".into());
+            return Err(Error::ParsingError("Name contains invalid characters".into()));
         }
         Ok(Self(value.to_string()))
     }

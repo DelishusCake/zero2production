@@ -8,7 +8,8 @@ use secrecy::Secret;
 
 use url::Url;
 
-use zero2prod::domain::EmailAddress;
+use crate::domain::EmailAddress;
+use crate::error::{Error, Result};
 
 const POSTMARK_TOKEN_HEADER: &str = "X-Postmark-Server-Token";
 
@@ -41,7 +42,7 @@ impl EmailClient {
     }
 
     #[tracing::instrument(name = "Send an email via API")]
-    pub async fn send(&self, email: Email) -> anyhow::Result<()> {
+    pub async fn send(&self, email: Email) -> Result<()> {
         use secrecy::ExposeSecret;
 
         let body = email.as_request(&self.sender);
@@ -51,8 +52,10 @@ impl EmailClient {
             .header(POSTMARK_TOKEN_HEADER, self.api_auth_token.expose_secret())
             .json(&body)
             .send()
-            .await?
-            .error_for_status()?;
+            .await
+            .map_err(Error::SendEmailError)?
+            .error_for_status()
+            .map_err(Error::SendEmailError)?;
         Ok(())
     }
 }

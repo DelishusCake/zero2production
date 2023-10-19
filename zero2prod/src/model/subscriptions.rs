@@ -7,6 +7,7 @@ use serde::Serialize;
 use sqlx::PgExecutor;
 
 use crate::domain::{EmailAddress, PersonName};
+use crate::error::Result;
 
 #[derive(Debug)]
 pub struct NewSubscription {
@@ -32,7 +33,7 @@ impl Subscription {
     pub async fn insert(
         executor: impl PgExecutor<'_>,
         new_subscriber: &NewSubscription,
-    ) -> sqlx::Result<Uuid> {
+    ) -> Result<Uuid> {
         let row = sqlx::query!(
             "insert into subscriptions(name, email) values ($1, $2) returning id",
             new_subscriber.name.as_ref(),
@@ -45,7 +46,7 @@ impl Subscription {
     }
 
     #[tracing::instrument(name = "Confirm a subscriber by id", skip(executor))]
-    pub async fn confirm_by_id(executor: impl PgExecutor<'_>, id: Uuid) -> sqlx::Result<()> {
+    pub async fn confirm_by_id(executor: impl PgExecutor<'_>, id: Uuid) -> Result<()> {
         let confirmed_at = Utc::now();
         sqlx::query!(
             "update subscriptions set confirmed_at=$2 where id=$1",
@@ -58,12 +59,13 @@ impl Subscription {
     }
 
     #[tracing::instrument(name = "Fetch all confirmed subscriptions", skip(executor))]
-    pub async fn fetch_all_confirmed(executor: impl PgExecutor<'_>) -> sqlx::Result<Vec<Self>> {
-        sqlx::query_as!(
+    pub async fn fetch_all_confirmed(executor: impl PgExecutor<'_>) -> Result<Vec<Self>> {
+        let subscriptions = sqlx::query_as!(
             Self,
             "select * from subscriptions where confirmed_at is not null"
         )
         .fetch_all(executor)
-        .await
+        .await?;
+        Ok(subscriptions)
     }
 }

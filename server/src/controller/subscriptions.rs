@@ -1,19 +1,16 @@
 use actix_web::dev::HttpServiceFactory;
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 
-use jwt::{SignWithKey, VerifyWithKey};
-
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use sqlx::PgPool;
+
 use url::Url;
 
-use uuid::Uuid;
-
+use zero2prod::client::{Email, EmailClient};
+use zero2prod::crypto::{Confirmation, SigningKey};
 use zero2prod::model::{NewSubscription, Subscription};
 
-use crate::client::{Email, EmailClient};
-use crate::crypto::SigningKey;
 use crate::error::{RestError, RestResult};
 
 #[derive(Debug, Deserialize)]
@@ -23,22 +20,13 @@ pub struct NewSubscriptionForm {
 }
 
 impl TryInto<NewSubscription> for NewSubscriptionForm {
-    type Error = String;
+    type Error = RestError;
 
     fn try_into(self) -> Result<NewSubscription, Self::Error> {
         let name = self.name.parse()?;
         let email = self.email.parse()?;
 
         Ok(NewSubscription { name, email })
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Confirmation(Uuid);
-
-impl From<Confirmation> for Uuid {
-    fn from(value: Confirmation) -> Uuid {
-        value.0
     }
 }
 
@@ -54,7 +42,7 @@ async fn create(
     email_client: web::Data<EmailClient>,
     form: web::Form<NewSubscriptionForm>,
 ) -> RestResult<impl Responder> {
-    let new_subscription: NewSubscription = form.0.try_into().map_err(RestError::ParseError)?;
+    let new_subscription: NewSubscription = form.0.try_into()?;
 
     // Transaction context
     {
@@ -62,17 +50,14 @@ async fn create(
 
         let id = Subscription::insert(&mut *tx, &new_subscription).await?;
 
-        let confirmation = Confirmation(id);
-
-        let confirmation_url = build_confirmation_url(confirmation, &signing_key, &req)?;
+        let confirmation_url = build_confirmation_url(id.into(), &signing_key, &req)?;
 
         email_client
             .send(build_confirmation_email(
                 &new_subscription,
                 confirmation_url,
             ))
-            .await
-            .map_err(|_| RestError::FailedToSendEmail)?;
+            .await?;
 
         tx.commit().await?;
     }
@@ -87,13 +72,12 @@ async fn confirm(
     signing_key: web::Data<SigningKey>,
     path: web::Path<(String,)>,
 ) -> RestResult<impl Responder> {
+    let pool = pool.get_ref();
     let (token_str,) = path.into_inner();
 
-    let confirmation: Confirmation = token_str
-        .verify_with_key(signing_key.as_ref())
-        .map_err(|_| RestError::InvalidConfirmationToken)?;
+    let confirmation = Confirmation::verify(signing_key.as_ref(), &token_str)?;
 
-    Subscription::confirm_by_id(&**pool, confirmation.into()).await?;
+    Subscription::confirm_by_id(pool, confirmation.into()).await?;
 
     Ok(HttpResponse::Ok())
 }
@@ -103,13 +87,9 @@ fn build_confirmation_url(
     signing_key: &SigningKey,
     req: &HttpRequest,
 ) -> RestResult<Url> {
-    let token = confirmation
-        .sign_with_key(signing_key)
-        .map_err(|_| RestError::FailedToSignToken)?;
+    let token = confirmation.sign(signing_key)?;
 
-    let url = req
-        .url_for("confirm_subscription", [&token])
-        .map_err(|_| RestError::FailedToSignToken)?;
+    let url = req.url_for("confirm_subscription", [&token])?;
 
     Ok(url)
 }
