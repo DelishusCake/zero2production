@@ -13,9 +13,10 @@ use url::Url;
 
 use wiremock::MockServer;
 
+use zero2prod::client::EmailClient;
+use zero2prod::crypto::SigningKey;
+
 use server::app;
-use server::client::EmailClient;
-use server::crypto::SigningKey;
 
 #[derive(Debug, Serialize)]
 pub struct NewSubscriber {
@@ -45,8 +46,9 @@ impl TestApp {
                 .take(7)
                 .map(char::from)
                 .collect();
+            let rand_key = Secret::new(rand_key);
 
-            SigningKey::new(&Secret::new(rand_key)).expect("Failed to create crypto signing key")
+            SigningKey::new(&rand_key).expect("Failed to create crypto signing key")
         };
 
         let email_server = MockServer::start().await;
@@ -57,9 +59,7 @@ impl TestApp {
                 .expect("Failed to parse sender email address");
             let api_base_url =
                 Url::parse(&email_server.uri()).expect("Failed to parse mock server uri");
-            let api_auth_token = "TestAuthorization"
-                .parse()
-                .expect("Failed to parse authorization token");
+            let api_auth_token = Secret::new("TestAuthorization".into());
             let api_timeout = Duration::from_secs(2);
 
             EmailClient::new(sender, api_timeout, api_base_url, api_auth_token)
@@ -80,8 +80,8 @@ impl TestApp {
     }
 
     pub fn request(&self, method: Method, url: &str) -> reqwest::RequestBuilder {
-        self.client
-            .request(method, format!("{}/{}", &self.addr, url))
+        let url = format!("{}/{}", &self.addr, url);
+        self.client.request(method, url)
     }
 
     pub async fn health_check(&self) -> reqwest::Result<Response> {

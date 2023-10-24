@@ -10,8 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use uuid::Uuid;
 
-use crate::error::{Error, Result};
-
 #[derive(Clone)]
 pub struct SigningKey(Hmac<Sha256>);
 
@@ -53,18 +51,16 @@ impl From<Uuid> for Confirmation {
 }
 
 impl Confirmation {
-    pub fn sign(&self, key: &SigningKey) -> Result<String> {
+    pub fn sign(&self, key: &SigningKey) -> Result<String, jwt::Error> {
         use jwt::SignWithKey;
 
-        self.0.sign_with_key(key).map_err(Error::TokenSigning)
+        self.0.sign_with_key(key)
     }
 
-    pub fn verify(key: &SigningKey, token: &str) -> Result<Self> {
+    pub fn verify(key: &SigningKey, token: &str) -> Result<Self, jwt::Error> {
         use jwt::VerifyWithKey;
 
-        let claims = token
-            .verify_with_key(key)
-            .map_err(Error::TokenVerification)?;
+        let claims = token.verify_with_key(key)?;
 
         Ok(Self(claims))
     }

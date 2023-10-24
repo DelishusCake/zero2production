@@ -20,7 +20,7 @@ pub struct NewSubscriptionForm {
 }
 
 impl TryInto<NewSubscription> for NewSubscriptionForm {
-    type Error = RestError;
+    type Error = String;
 
     fn try_into(self) -> Result<NewSubscription, Self::Error> {
         let name = self.name.parse()?;
@@ -42,7 +42,7 @@ async fn create(
     email_client: web::Data<EmailClient>,
     form: web::Form<NewSubscriptionForm>,
 ) -> RestResult<impl Responder> {
-    let new_subscription: NewSubscription = form.0.try_into()?;
+    let new_subscription: NewSubscription = form.0.try_into().map_err(RestError::ParseError)?;
 
     // Transaction context
     {
@@ -57,7 +57,8 @@ async fn create(
                 &new_subscription,
                 confirmation_url,
             ))
-            .await?;
+            .await
+            .map_err(RestError::FailedToSendEmail)?;
 
         tx.commit().await?;
     }
@@ -72,12 +73,12 @@ async fn confirm(
     signing_key: web::Data<SigningKey>,
     path: web::Path<(String,)>,
 ) -> RestResult<impl Responder> {
-    let pool = pool.get_ref();
     let (token_str,) = path.into_inner();
 
-    let confirmation = Confirmation::verify(signing_key.as_ref(), &token_str)?;
+    let confirmation = Confirmation::verify(&signing_key, &token_str)
+        .map_err(RestError::FailedToVerifyToken)?;
 
-    Subscription::confirm_by_id(pool, confirmation.into()).await?;
+    Subscription::confirm_by_id(pool.get_ref(), confirmation.into()).await?;
 
     Ok(HttpResponse::Ok())
 }
@@ -87,7 +88,9 @@ fn build_confirmation_url(
     signing_key: &SigningKey,
     req: &HttpRequest,
 ) -> RestResult<Url> {
-    let token = confirmation.sign(signing_key)?;
+    let token = confirmation
+        .sign(signing_key)
+        .map_err(RestError::FailedToSignToken)?;
 
     let url = req.url_for("confirm_subscription", [&token])?;
 

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "update subscriptions set confirmed_at=$2 where id=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "50696e05537784976b3bcaae59cd80cf7e19051a68cbc2f1b6a743a734d93420"
+}
