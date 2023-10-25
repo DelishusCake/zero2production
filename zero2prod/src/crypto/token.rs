@@ -47,7 +47,7 @@ pub enum TokenError {
 pub type TokenResult<T> = Result<T, TokenError>;
 
 // A serialized token
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token(String);
 
 impl Token {

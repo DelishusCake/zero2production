@@ -8,7 +8,7 @@ use sqlx::PgPool;
 use url::Url;
 
 use zero2prod::client::{Email, EmailClient};
-use zero2prod::crypto::{Confirmation, SigningKey};
+use zero2prod::crypto::{SigningKey, Token};
 use zero2prod::model::{NewSubscription, Subscription};
 
 use crate::error::{RestError, RestResult};
@@ -42,6 +42,8 @@ async fn create(
     email_client: web::Data<EmailClient>,
     form: web::Form<NewSubscriptionForm>,
 ) -> RestResult<impl Responder> {
+    let signing_key = signing_key.get_ref();
+
     let new_subscription: NewSubscription = form.0.try_into().map_err(RestError::ParseError)?;
 
     // Transaction context
@@ -50,10 +52,8 @@ async fn create(
 
         let id = Subscription::insert(&mut *tx, &new_subscription).await?;
 
-        let confirmation: Confirmation = id.into();
-
-        let token = confirmation
-            .sign(&signing_key)
+        let token = Token::builder(id)
+            .sign(signing_key.as_ref())
             .map_err(RestError::FailedToSignToken)?;
 
         let confirmation_url = req.url_for("confirm_subscription", [&token])?;
@@ -80,11 +80,14 @@ async fn confirm(
     path: web::Path<(String,)>,
 ) -> RestResult<impl Responder> {
     let (token_str,) = path.into_inner();
+    let signing_key = signing_key.get_ref();
 
-    let confirmation =
-        Confirmation::verify(&signing_key, &token_str).map_err(RestError::FailedToVerifyToken)?;
+    let subscription_id = token_str
+        .parse::<Token>()
+        .and_then(|token| token.verify(signing_key.as_ref()))
+        .map_err(RestError::FailedToVerifyToken)?;
 
-    Subscription::confirm_by_id(pool.get_ref(), confirmation.into()).await?;
+    Subscription::confirm_by_id(pool.get_ref(), subscription_id).await?;
 
     Ok(HttpResponse::Ok())
 }
