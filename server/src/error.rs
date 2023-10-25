@@ -10,10 +10,10 @@ pub enum RestError {
     ParseError(String),
 
     #[error("Failed to Sign Token")]
-    FailedToSignToken(jwt::Error),
+    FailedToSignToken(zero2prod::crypto::TokenError),
 
     #[error("Failed to Verify Token")]
-    FailedToVerifyToken(jwt::Error),
+    FailedToVerifyToken(zero2prod::crypto::TokenError),
 
     #[error("Failed to Send Email")]
     FailedToSendEmail(reqwest::Error),

@@ -16,13 +16,13 @@ anyhow = "1.0"
 thiserror = "1.0"
 
 # Crypto
-jwt = "0.16"
 hmac = "0.12"
 sha2 = "0.10"
 
 # Types
 url = "2.4"
 regex = "1.9"
+base64 = "0.21"
 chrono = { version = "0.4", features = ["serde"] }
 secrecy = { version = "0.8", features = ["serde"] }
 

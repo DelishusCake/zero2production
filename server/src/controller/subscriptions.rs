@@ -50,7 +50,13 @@ async fn create(
 
         let id = Subscription::insert(&mut *tx, &new_subscription).await?;
 
-        let confirmation_url = build_confirmation_url(id.into(), &signing_key, &req)?;
+        let confirmation: Confirmation = id.into();
+
+        let token = confirmation
+            .sign(&signing_key)
+            .map_err(RestError::FailedToSignToken)?;
+
+        let confirmation_url = req.url_for("confirm_subscription", [&token])?;
 
         email_client
             .send(build_confirmation_email(
@@ -75,26 +81,12 @@ async fn confirm(
 ) -> RestResult<impl Responder> {
     let (token_str,) = path.into_inner();
 
-    let confirmation = Confirmation::verify(&signing_key, &token_str)
-        .map_err(RestError::FailedToVerifyToken)?;
+    let confirmation =
+        Confirmation::verify(&signing_key, &token_str).map_err(RestError::FailedToVerifyToken)?;
 
     Subscription::confirm_by_id(pool.get_ref(), confirmation.into()).await?;
 
     Ok(HttpResponse::Ok())
-}
-
-fn build_confirmation_url(
-    confirmation: Confirmation,
-    signing_key: &SigningKey,
-    req: &HttpRequest,
-) -> RestResult<Url> {
-    let token = confirmation
-        .sign(signing_key)
-        .map_err(RestError::FailedToSignToken)?;
-
-    let url = req.url_for("confirm_subscription", [&token])?;
-
-    Ok(url)
 }
 
 fn build_confirmation_email(subscription: &NewSubscription, confirmation_url: Url) -> Email {
