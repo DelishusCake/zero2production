@@ -96,6 +96,7 @@ async fn subcribe_sends_a_confirmation_email_for_valid_request(pool: PgPool) -> 
     Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
+        // Expect a send-email request
         .expect(1)
         .mount(&app.email_server)
         .await;
@@ -122,6 +123,7 @@ async fn subcribe_sends_a_confirmation_email_with_link(pool: PgPool) -> sqlx::Re
     Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
+        // Expect a send-email request
         .expect(1)
         .mount(&app.email_server)
         .await;
@@ -163,6 +165,7 @@ async fn subscription_can_be_confirmed(pool: PgPool) -> sqlx::Result<()> {
     Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
+        // Expect a send-email request
         .expect(1)
         .mount(&app.email_server)
         .await;
@@ -219,6 +222,41 @@ async fn subscription_can_be_confirmed(pool: PgPool) -> sqlx::Result<()> {
     .expect("Failed to fetch updated row");
 
     assert!(subscription.confirmed_at.is_some());
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../migrations")]
+async fn subcribe_is_consistent_if_email_send_fails(pool: PgPool) -> sqlx::Result<()> {
+    let app = TestApp::spawn(&pool).await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        // Ensure that send-email fails
+        .respond_with(ResponseTemplate::new(500))
+        // Expect a send-email request
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let new_subscriber = NewSubscriber {
+        name: Some("Test Subscrber".into()),
+        email: Some("test@test.com".into()),
+    };
+
+    let res = app
+        .subscription_create(&new_subscriber)
+        .await
+        .expect("Failed to execute request");
+
+    assert!(res.status().is_server_error());
+
+    let subscription = sqlx::query!("select name, email from subscriptions")
+        .fetch_optional(&pool)
+        .await
+        .expect("Failed to fetch row");
+
+    assert!(subscription.is_none());
 
     Ok(())
 }

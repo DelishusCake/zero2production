@@ -13,22 +13,26 @@ use zero2prod::crypto::SigningKey;
 
 use crate::controller::subscriptions;
 
+/// Simple health-check endpoint
 #[tracing::instrument(name = "Health check")]
 #[get("/health_check")]
 async fn health_check() -> impl Responder {
     HttpResponse::Ok().body("I am alive")
 }
 
+/// Run the application on a specified TCP listener
 pub fn run(
+    listener: TcpListener,
     pool: PgPool,
     signing_key: SigningKey,
     email_client: EmailClient,
-    listener: TcpListener,
 ) -> anyhow::Result<Server> {
+    // Wrap application data
     let pool = web::Data::new(pool);
     let signing_key = web::Data::new(signing_key);
     let email_client = web::Data::new(email_client);
 
+    // Start the server
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())

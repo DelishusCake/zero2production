@@ -10,6 +10,7 @@ path = "src/lib.rs"
 
 [dependencies]
 lazy_static = "1.4"
+async-trait = "0.1"
 
 # Errors
 anyhow = "1.0"

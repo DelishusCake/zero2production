@@ -5,14 +5,9 @@ use unicode_segmentation::UnicodeSegmentation;
 
 const MAX_LEN: usize = 256;
 
-#[derive(Debug, Clone)]
+/// A user supplied name of a person.
+#[derive(Debug, PartialEq, Clone)]
 pub struct PersonName(String);
-
-impl AsRef<str> for PersonName {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
 
 impl FromStr for PersonName {
     type Err = String;
@@ -34,6 +29,12 @@ impl FromStr for PersonName {
             return Err("Name contains invalid characters".into());
         }
         Ok(Self(value.to_string()))
+    }
+}
+
+impl AsRef<str> for PersonName {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 

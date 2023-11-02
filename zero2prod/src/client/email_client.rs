@@ -12,6 +12,7 @@ use crate::domain::EmailAddress;
 
 const POSTMARK_TOKEN_HEADER: &str = "X-Postmark-Server-Token";
 
+/// Email-sending client, implemented for the Postmark email service
 #[derive(Debug)]
 pub struct EmailClient {
     client: Client,
@@ -22,6 +23,7 @@ pub struct EmailClient {
 }
 
 impl EmailClient {
+    /// Create a new, shared email client
     pub fn new(
         sender: EmailAddress,
         api_timeout: Duration,
@@ -40,6 +42,7 @@ impl EmailClient {
         })
     }
 
+    /// Send an email
     #[tracing::instrument(name = "Send an email via API")]
     pub async fn send(&self, email: Email) -> reqwest::Result<()> {
         use secrecy::ExposeSecret;
@@ -57,6 +60,8 @@ impl EmailClient {
     }
 }
 
+/// Email-wrapper for sending emails.
+/// TODO: Validate all fields with domain objects.
 #[derive(Debug)]
 pub struct Email {
     pub recipient: EmailAddress,

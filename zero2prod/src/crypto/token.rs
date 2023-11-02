@@ -55,7 +55,7 @@ impl From<base64::DecodeError> for TokenError {
 /// Wrapper for token results
 pub type TokenResult<T> = Result<T, TokenError>;
 
-// A serialized token
+// A serialized, cryptographically-signed token
 #[derive(Debug, Clone)]
 pub struct Token(String);
 

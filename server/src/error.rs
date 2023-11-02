@@ -3,7 +3,8 @@ use actix_web::ResponseError;
 
 pub type RestResult<T> = Result<T, RestError>;
 
-// TODO: I18n for errors
+/// Errors that can be returned by the Rest API
+/// TODO: I18n for errors
 #[derive(Debug, thiserror::Error)]
 pub enum RestError {
     #[error("Parse Error: {0}")]

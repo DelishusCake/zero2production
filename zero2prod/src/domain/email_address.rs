@@ -6,14 +6,9 @@ use unicode_segmentation::UnicodeSegmentation;
 
 const MAX_LEN: usize = 256;
 
-#[derive(Debug, Clone)]
+/// A user supplied email-address
+#[derive(Debug, PartialEq, Clone)]
 pub struct EmailAddress(String);
-
-impl AsRef<str> for EmailAddress {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
 
 impl FromStr for EmailAddress {
     type Err = String;
@@ -37,6 +32,12 @@ impl FromStr for EmailAddress {
         let value = value.trim().to_lowercase();
 
         Ok(Self(value))
+    }
+}
+
+impl AsRef<str> for EmailAddress {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 
