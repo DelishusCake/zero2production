@@ -30,17 +30,26 @@ pub enum TokenError {
     SignatureMismatch,
     #[error("Token is expired")]
     Expired,
-    #[error("Token is of invalid format")]
-    InvalidFormat,
-    // External errors
-    #[error("Invalid HMAC message length")]
-    InvalidLength(#[from] hmac::digest::InvalidLength),
-    #[error("Invalid Utf8 string")]
-    Utf8(#[from] std::str::Utf8Error),
-    #[error("Serialization error")]
-    Serde(#[from] serde_json::Error),
-    #[error("Decode error")]
-    DecodeError(#[from] base64::DecodeError),
+    #[error("Failed to decode or encode token")]
+    DecodeEncodeError,
+}
+
+impl From<std::str::Utf8Error> for TokenError {
+    fn from(_e: std::str::Utf8Error) -> Self {
+        Self::DecodeEncodeError
+    }
+}
+
+impl From<serde_json::Error> for TokenError {
+    fn from(_e: serde_json::Error) -> Self {
+        Self::DecodeEncodeError
+    }
+}
+
+impl From<base64::DecodeError> for TokenError {
+    fn from(_e: base64::DecodeError) -> Self {
+        Self::DecodeEncodeError
+    }
 }
 
 /// Wrapper for token results
@@ -63,7 +72,7 @@ impl Token {
         K: Mac + Clone,
     {
         // Split the token string into it's base64 encoded components
-        let (msg, sig) = self.split().ok_or(TokenError::InvalidFormat)?;
+        let (msg, sig) = self.split().ok_or(TokenError::DecodeEncodeError)?;
         // Decode the components
         let msg = BASE64_ENGINE.decode(msg)?;
         let sig = BASE64_ENGINE.decode(sig)?;
@@ -71,11 +80,11 @@ impl Token {
         TokenMessage::verify_from_bytes(key, &msg, &sig)
     }
 
-    fn split(self) -> Option<(String, String)> {
+    fn split(&self) -> Option<(&str, &str)> {
         let captures = TOKEN_REGEX.captures(&self.0)?;
 
-        let msg = captures.get(1)?.as_str().to_string();
-        let sig = captures.get(2)?.as_str().to_string();
+        let msg = captures.get(1)?.as_str();
+        let sig = captures.get(2)?.as_str();
         Some((msg, sig))
     }
 }
@@ -97,7 +106,7 @@ impl FromStr for Token {
 
     fn from_str(token: &str) -> TokenResult<Self> {
         if !TOKEN_REGEX.is_match(token) {
-            Err(TokenError::InvalidFormat)
+            Err(TokenError::DecodeEncodeError)
         } else {
             Ok(Self(token.to_string()))
         }
@@ -137,7 +146,7 @@ impl<T: Serialize> TokenBuilder<T> {
         // Serialize the message to a string
         let msg = self.serialize_message()?;
         // Sign the message
-        let sig = sign_message(key, &msg);
+        let sig = sign_message(key, msg.as_bytes());
         // Base64 encode the two portions of the token
         let msg = BASE64_ENGINE.encode(msg);
         let sig = BASE64_ENGINE.encode(sig);
@@ -205,15 +214,12 @@ impl<T> From<TokenBuilder<T>> for TokenMessage<T> {
 }
 
 /// Sign a message with a Key
-fn sign_message<K>(key: &K, msg: &str) -> Vec<u8>
+fn sign_message<K>(key: &K, msg: &[u8]) -> Vec<u8>
 where
     K: Mac + Clone,
 {
-    key.clone()
-        .chain_update(msg.as_bytes())
-        .finalize()
-        .into_bytes()
-        .to_vec()
+    let key = key.clone();
+    key.chain_update(msg).finalize().into_bytes().to_vec()
 }
 
 /// Verify a signed message with a key
@@ -221,7 +227,7 @@ fn verify_message<K>(key: &K, msg: &[u8], signature: &[u8]) -> TokenResult<()>
 where
     K: Mac + Clone,
 {
-    let message_signature = key.clone().chain_update(msg).finalize().into_bytes();
+    let message_signature = sign_message(key, msg);
     // Verify that the hmac signature matches the passed signature
     if message_signature[..] != signature[..] {
         Err(TokenError::SignatureMismatch)
