@@ -138,20 +138,11 @@ async fn subcribe_sends_a_confirmation_email_with_link(pool: PgPool) -> sqlx::Re
         .await
         .expect("Failed to execute request");
 
-    let get_link = |s: &str| {
-        let links: Vec<_> = linkify::LinkFinder::new()
-            .links(s)
-            .filter(|l| *l.kind() == linkify::LinkKind::Url)
-            .collect();
-        assert_eq!(1, links.len());
-        links[0].as_str().to_string()
-    };
-
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
 
     let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
-    let html_link = get_link(&body["HtmlBody"].as_str().unwrap());
-    let text_link = get_link(&body["TextBody"].as_str().unwrap());
+    let html_link = extract_email_link(&body["HtmlBody"].as_str().unwrap());
+    let text_link = extract_email_link(&body["TextBody"].as_str().unwrap());
 
     assert_eq!(html_link, text_link);
 
@@ -190,19 +181,10 @@ async fn subscription_can_be_confirmed(pool: PgPool) -> sqlx::Result<()> {
 
     assert!(subscription.confirmed_at.is_none());
 
-    let get_link = |s: &str| {
-        let links: Vec<_> = linkify::LinkFinder::new()
-            .links(s)
-            .filter(|l| *l.kind() == linkify::LinkKind::Url)
-            .collect();
-        assert_eq!(1, links.len());
-        links[0].as_str().to_string()
-    };
-
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
 
     let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
-    let link = get_link(&body["HtmlBody"].as_str().unwrap());
+    let link = extract_email_link(&body["HtmlBody"].as_str().unwrap());
 
     let res = app
         .client
@@ -259,4 +241,13 @@ async fn subcribe_is_consistent_if_email_send_fails(pool: PgPool) -> sqlx::Resul
     assert!(subscription.is_none());
 
     Ok(())
+}
+
+fn extract_email_link(body: &str) -> String {
+    let links: Vec<_> = linkify::LinkFinder::new()
+        .links(body)
+        .filter(|l| *l.kind() == linkify::LinkKind::Url)
+        .collect();
+    assert_eq!(1, links.len());
+    links[0].as_str().to_string()
 }

@@ -15,11 +15,11 @@ pub struct NewSubscription {
 
 /// Stored Subscription record
 #[derive(Debug, Serialize)]
-pub struct Subscription {
+pub(crate) struct Subscription {
     /// ID of the subscription
     pub id: Uuid,
     /// User supplied data
-    /// TODO: Should this be parsed back into domain objects?
+    /// TODO: Should these be parsed back into domain objects?
     pub name: String,
     pub email: String,
     /// Confirmation timestamp.
@@ -29,4 +29,14 @@ pub struct Subscription {
     /// NOTE: Auto-set and updated by database triggers
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// Stored subscription record that has been confirmed via email
+#[derive(Debug)]
+pub struct ConfirmedSubscription {
+    /// ID of the subscription
+    pub id: Uuid,
+    /// User supplied email
+    /// TODO: Should this be parsed back into domain objects?
+    pub email: String,
 }

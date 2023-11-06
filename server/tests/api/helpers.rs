@@ -24,6 +24,17 @@ pub struct NewSubscriber {
     pub email: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct NewsletterContent {
+    pub text: Option<String>,
+    pub html: Option<String>,
+}
+#[derive(Debug, Serialize)]
+pub struct Newsletter {
+    pub title: Option<String>,
+    pub content: Option<NewsletterContent>,
+}
+
 pub struct TestApp {
     addr: String,
 
@@ -66,7 +77,7 @@ impl TestApp {
                 .expect("Failed to create email client")
         };
 
-        let server = app::run(pool.clone(), signing_key, email_client, listener)
+        let server = app::run(listener, pool.clone(), signing_key, email_client)
             .expect("Failed to spawn app instance");
         let _ = tokio::spawn(server);
 
@@ -94,6 +105,13 @@ impl TestApp {
     ) -> reqwest::Result<Response> {
         self.request(Method::POST, "subscriptions")
             .form(new_subscriber)
+            .send()
+            .await
+    }
+
+    pub async fn newsletter_publish(&self, newsletter: &Newsletter) -> reqwest::Result<Response> {
+        self.request(Method::POST, "newsletters")
+            .json(newsletter)
             .send()
             .await
     }

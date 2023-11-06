@@ -62,12 +62,12 @@ async fn create(
             .map_err(RestError::FailedToSignToken)?;
         // Get the confirmation URL to send to the user
         let confirmation_url = req.url_for("confirm_subscription", [&token])?;
+        // Build the confirmation email
+        let recipient = new_subscription.email.clone();
+        let email = build_confirmation_email(&new_subscription, confirmation_url);
         // Send the confirmation email
         email_client
-            .send(build_confirmation_email(
-                &new_subscription,
-                confirmation_url,
-            ))
+            .send(&recipient, &email)
             .await
             .map_err(RestError::FailedToSendEmail)?;
         // Commit the new subscriber to the database if everything worked
@@ -103,7 +103,6 @@ async fn confirm(
 /// Build a confirmation email object for a new subscriber
 /// TODO: Move this somewhere else
 fn build_confirmation_email(subscription: &NewSubscription, confirmation_url: Url) -> Email {
-    let recipient = subscription.email.clone();
     let subject = format!("Welcome {}!", subscription.name.as_ref());
     let html_body = format!("<h1>Welcome to our newsletter!</h1><p>Click <a href=\"{}\">here</a> to confirm your subscription.</p>", confirmation_url);
     let text_body = format!(
@@ -112,7 +111,6 @@ fn build_confirmation_email(subscription: &NewSubscription, confirmation_url: Ur
     );
 
     Email {
-        recipient,
         subject,
         html_body,
         text_body,

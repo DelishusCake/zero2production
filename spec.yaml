@@ -8,6 +8,9 @@ services:
     dockerfile_path: Dockerfile
     source_dir: .
     envs:
+    - key: APP_ENV
+      scope: RUN_TIME
+      value: prod
     - key: APP_DATABASE__USERNAME
       scope: RUN_TIME
       value: ${newsletter.USERNAME}

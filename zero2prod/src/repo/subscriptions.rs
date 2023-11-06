@@ -4,7 +4,7 @@ use chrono::Utc;
 
 use sqlx::{Executor, PgExecutor};
 
-use crate::model::{NewSubscription, Subscription};
+use crate::model::{ConfirmedSubscription, NewSubscription};
 
 /// Subscription repository trait, must be implemented for each database used.
 /// NOTE: Intended to facilitate easier testing/mocking
@@ -29,7 +29,7 @@ pub trait SubscriptionRepo {
     /// Fetch all subscribers that have been confirmed
     async fn fetch_all_confirmed<'con>(
         executor: impl Executor<'con, Database = Self::DB>,
-    ) -> sqlx::Result<Vec<Subscription>>;
+    ) -> sqlx::Result<Vec<ConfirmedSubscription>>;
 }
 
 /// Postgres Subscription Repositiory
@@ -72,13 +72,14 @@ impl SubscriptionRepo for PgSubscriptionRepo {
     #[tracing::instrument(name = "Fetch all confirmed subscriptions", skip(executor))]
     async fn fetch_all_confirmed<'con>(
         executor: impl PgExecutor<'con>,
-    ) -> sqlx::Result<Vec<Subscription>> {
+    ) -> sqlx::Result<Vec<ConfirmedSubscription>> {
         let subscriptions = sqlx::query_as!(
-            Subscription,
-            "select * from subscriptions where confirmed_at is not null"
+            ConfirmedSubscription,
+            "select id, email from subscriptions where confirmed_at is not null"
         )
         .fetch_all(executor)
         .await?;
+
         Ok(subscriptions)
     }
 }

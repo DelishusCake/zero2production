@@ -11,7 +11,7 @@ use tracing_actix_web::TracingLogger;
 use zero2prod::client::EmailClient;
 use zero2prod::crypto::SigningKey;
 
-use crate::controller::subscriptions;
+use crate::controller::{newsletters, subscriptions};
 
 /// Simple health-check endpoint
 #[tracing::instrument(name = "Health check")]
@@ -41,6 +41,7 @@ pub fn run(
             .app_data(email_client.clone())
             .service(health_check)
             .service(subscriptions::scope())
+            .service(newsletters::scope())
     })
     .listen(listener)?
     .run();

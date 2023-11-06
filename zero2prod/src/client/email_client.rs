@@ -44,10 +44,10 @@ impl EmailClient {
 
     /// Send an email
     #[tracing::instrument(name = "Send an email via API")]
-    pub async fn send(&self, email: Email) -> reqwest::Result<()> {
+    pub async fn send(&self, recipient: &EmailAddress, email: &Email) -> reqwest::Result<()> {
         use secrecy::ExposeSecret;
 
-        let body = email.as_request(&self.sender);
+        let body = email.as_request(&self.sender, &recipient);
 
         self.client
             .post(self.api_send_email_url.clone())
@@ -64,16 +64,19 @@ impl EmailClient {
 /// TODO: Validate all fields with domain objects.
 #[derive(Debug)]
 pub struct Email {
-    pub recipient: EmailAddress,
     pub subject: String,
     pub html_body: String,
     pub text_body: String,
 }
 
 impl Email {
-    fn as_request<'e>(&'e self, sender: &'e EmailAddress) -> SendEmailRequest<'e> {
+    fn as_request<'e>(
+        &'e self,
+        sender: &'e EmailAddress,
+        recipient: &'e EmailAddress,
+    ) -> SendEmailRequest<'e> {
         SendEmailRequest {
-            to: self.recipient.as_ref(),
+            to: recipient.as_ref(),
             from: sender.as_ref(),
             subject: &self.subject,
             html_body: &self.html_body,
@@ -137,7 +140,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        assert_ok!(client.send(fake_email()).await);
+        assert_ok!(client.send(&fake_email_address(), &fake_email()).await);
     }
 
     #[tokio::test]
@@ -151,7 +154,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        assert_err!(client.send(fake_email()).await);
+        assert_err!(client.send(&fake_email_address(), &fake_email()).await);
     }
 
     #[tokio::test]
@@ -165,7 +168,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        assert_err!(client.send(fake_email()).await);
+        assert_err!(client.send(&fake_email_address(), &fake_email()).await);
     }
 
     fn fake_email_address() -> EmailAddress {
@@ -173,12 +176,10 @@ mod tests {
     }
 
     fn fake_email() -> Email {
-        let recipient = fake_email_address();
         let subject: String = Sentence(1..2).fake();
         let content: String = Paragraph(1..2).fake();
 
         Email {
-            recipient,
             subject,
             html_body: content.clone(),
             text_body: content.clone(),

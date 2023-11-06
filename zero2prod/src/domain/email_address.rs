@@ -1,3 +1,4 @@
+use std::fmt;
 use std::str::FromStr;
 
 use regex::Regex;
@@ -38,6 +39,12 @@ impl FromStr for EmailAddress {
 impl AsRef<str> for EmailAddress {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl fmt::Display for EmailAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 

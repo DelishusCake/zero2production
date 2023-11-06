@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt;
 use std::str::FromStr;
 
 use unicode_segmentation::UnicodeSegmentation;
@@ -35,6 +36,12 @@ impl FromStr for PersonName {
 impl AsRef<str> for PersonName {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl fmt::Display for PersonName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
