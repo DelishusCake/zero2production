@@ -22,6 +22,7 @@ thiserror = "1.0"
 # Types
 url = "2.4"
 uuid = "1.4"
+base64 = "0.21"
 secrecy = { version = "0.8", features = ["serde"] }
 
 # Settings

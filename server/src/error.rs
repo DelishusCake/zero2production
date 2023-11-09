@@ -16,6 +16,9 @@ pub enum RestError {
     #[error("Failed to Verify Token")]
     FailedToVerifyToken(zero2prod::crypto::TokenError),
 
+    #[error("Failed to Authenticate User")]
+    FailedToAuthenticate(anyhow::Error),
+
     #[error("Failed to Send Email")]
     FailedToSendEmail(reqwest::Error),
 
@@ -33,7 +36,9 @@ impl ResponseError for RestError {
     fn status_code(&self) -> StatusCode {
         match self {
             Self::ParseError(_) => StatusCode::BAD_REQUEST,
-            Self::FailedToVerifyToken(_) => StatusCode::UNAUTHORIZED,
+            Self::FailedToAuthenticate(_) | Self::FailedToVerifyToken(_) => {
+                StatusCode::UNAUTHORIZED
+            }
             Self::Other(_)
             | Self::DatabaseError(_)
             | Self::FailedToSendEmail(_)

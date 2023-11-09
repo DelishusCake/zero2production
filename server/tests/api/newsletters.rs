@@ -5,13 +5,15 @@ use sqlx::PgPool;
 use wiremock::matchers::*;
 use wiremock::{Mock, ResponseTemplate};
 
-use crate::helpers::{NewSubscriber, Newsletter, NewsletterContent, TestApp};
+use crate::helpers::{Credentials, NewSubscriber, Newsletter, NewsletterContent, TestApp};
 
 #[sqlx::test(migrations = "../migrations")]
 async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
     pool: PgPool,
 ) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
+
+    let creds = generate_creds();
 
     create_unconfirmed_subscriber(&app).await;
 
@@ -29,7 +31,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
         }),
     };
     let res = app
-        .newsletter_publish(&newsletter)
+        .newsletter_publish(Some(&creds), &newsletter)
         .await
         .expect("Failed to send request to create newsletter");
 
@@ -39,8 +41,31 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
 }
 
 #[sqlx::test(migrations = "../migrations")]
+async fn newsletters_without_credentials_are_unauthorized(pool: PgPool) -> sqlx::Result<()> {
+    let app = TestApp::spawn(&pool).await;
+
+    let newsletter = Newsletter {
+        title: Some("Newsletter Title".into()),
+        content: Some(NewsletterContent {
+            text: Some("Newsletter Body".into()),
+            html: Some("<p>Newsletter Body</p>".into()),
+        }),
+    };
+    let res = app
+        .newsletter_publish(None, &newsletter)
+        .await
+        .expect("Failed to send request to create newsletter");
+
+    assert_eq!(StatusCode::UNAUTHORIZED, res.status());
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../migrations")]
 async fn malformed_newsletters_are_rejected(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
+
+    let creds = generate_creds();
 
     Mock::given(any())
         .respond_with(ResponseTemplate::new(200))
@@ -89,7 +114,7 @@ async fn malformed_newsletters_are_rejected(pool: PgPool) -> sqlx::Result<()> {
     ];
     for (test_name, newsletter) in test_cases {
         let res = app
-            .newsletter_publish(&newsletter)
+            .newsletter_publish(Some(&creds), &newsletter)
             .await
             .expect("Failed to send request to create newsletter");
 
@@ -97,6 +122,15 @@ async fn malformed_newsletters_are_rejected(pool: PgPool) -> sqlx::Result<()> {
     }
 
     Ok(())
+}
+
+fn generate_creds() -> Credentials {
+    use uuid::Uuid;
+
+    Credentials {
+        username: Uuid::new_v4().to_string(),
+        password: Uuid::new_v4().to_string(),
+    }
 }
 
 async fn create_unconfirmed_subscriber(app: &TestApp) {

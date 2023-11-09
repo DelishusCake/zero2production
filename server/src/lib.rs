@@ -1,5 +1,7 @@
 /// Basic application code
 pub mod app;
+/// Application authorization
+pub mod auth;
 /// Controllers for REST endpoints
 pub mod controller;
 /// Error enums

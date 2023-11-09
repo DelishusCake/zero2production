@@ -8,6 +8,7 @@ use sqlx::PgPool;
 use zero2prod::client::{Email, EmailClient};
 use zero2prod::repo::{PgSubscriptionRepo, SubscriptionRepo};
 
+use crate::auth::Administrator;
 use crate::error::{RestError, RestResult};
 
 #[derive(Debug, Deserialize)]
@@ -36,6 +37,7 @@ impl TryFrom<PublishBody> for Email {
 #[tracing::instrument(name = "Publish a newsletter", skip(pool, email_client))]
 #[post("")]
 async fn publish(
+    admin: Administrator, // Administrator guard
     body: web::Json<PublishBody>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,

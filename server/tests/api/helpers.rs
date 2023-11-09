@@ -35,6 +35,12 @@ pub struct Newsletter {
     pub content: Option<NewsletterContent>,
 }
 
+#[derive(Debug)]
+pub struct Credentials {
+    pub username: String,
+    pub password: String,
+}
+
 pub struct TestApp {
     addr: String,
 
@@ -95,6 +101,20 @@ impl TestApp {
         self.client.request(method, url)
     }
 
+    pub fn authorized_request(
+        &self,
+        method: Method,
+        url: &str,
+        credentials: Option<&Credentials>,
+    ) -> reqwest::RequestBuilder {
+        let req = self.request(method, url);
+        if let Some(creds) = credentials {
+            req.basic_auth(creds.username.clone(), Some(creds.password.clone()))
+        } else {
+            req
+        }
+    }
+
     pub async fn health_check(&self) -> reqwest::Result<Response> {
         self.request(Method::GET, "health_check").send().await
     }
@@ -109,8 +129,12 @@ impl TestApp {
             .await
     }
 
-    pub async fn newsletter_publish(&self, newsletter: &Newsletter) -> reqwest::Result<Response> {
-        self.request(Method::POST, "newsletters")
+    pub async fn newsletter_publish(
+        &self,
+        credentials: Option<&Credentials>,
+        newsletter: &Newsletter,
+    ) -> reqwest::Result<Response> {
+        self.authorized_request(Method::POST, "newsletters", credentials)
             .json(newsletter)
             .send()
             .await
