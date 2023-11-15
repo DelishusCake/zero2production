@@ -9,7 +9,7 @@ use url::Url;
 
 use zero2prod::client::{Email, EmailClient};
 use zero2prod::crypto::{SigningKey, Token};
-use zero2prod::repo::{SubscriptionRepo, NewSubscription};
+use zero2prod::repo::{NewSubscription, SubscriptionRepo};
 
 use crate::error::{RestError, RestResult};
 

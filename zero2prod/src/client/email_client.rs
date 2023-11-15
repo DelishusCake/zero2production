@@ -47,7 +47,7 @@ impl EmailClient {
     pub async fn send(&self, recipient: &EmailAddress, email: &Email) -> reqwest::Result<()> {
         use secrecy::ExposeSecret;
 
-        let body = email.as_request(&self.sender, &recipient);
+        let body = email.as_request(&self.sender, recipient);
 
         self.client
             .post(self.api_send_email_url.clone())

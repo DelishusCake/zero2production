@@ -1,8 +1,6 @@
 use uuid::Uuid;
 
-use chrono::{DateTime, Utc};
-
-use serde::Serialize;
+use chrono::Utc;
 
 use sqlx::PgExecutor;
 
@@ -13,24 +11,6 @@ use crate::domain::{EmailAddress, PersonName};
 pub struct NewSubscription {
     pub name: PersonName,
     pub email: EmailAddress,
-}
-
-/// Stored Subscription record
-#[derive(Debug, Serialize)]
-pub struct Subscription {
-    /// ID of the subscription
-    pub id: Uuid,
-    /// User supplied data
-    /// TODO: Should these be parsed back into domain objects?
-    pub name: String,
-    pub email: String,
-    /// Confirmation timestamp.
-    /// `None` if the subscription is not confirmed, and therefore cannot receive newsletter emails
-    pub confirmed_at: Option<DateTime<Utc>>,
-    /// Creation and update timestamps
-    /// NOTE: Auto-set and updated by database triggers
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 /// Stored subscription record that has been confirmed via email
@@ -64,7 +44,10 @@ impl SubscriptionRepo {
     }
 
     #[tracing::instrument(name = "Confirm a subscriber by id", skip(executor))]
-    pub async fn confirm_by_id<'con>(executor: impl PgExecutor<'con>, id: Uuid) -> sqlx::Result<()> {
+    pub async fn confirm_by_id<'con>(
+        executor: impl PgExecutor<'con>,
+        id: Uuid,
+    ) -> sqlx::Result<()> {
         let confirmed_at = Utc::now();
         sqlx::query!(
             "update subscriptions set confirmed_at=$2 where id=$1",
@@ -93,8 +76,8 @@ impl SubscriptionRepo {
 
 #[cfg(test)]
 mod tests {
-    use sqlx::PgPool;
     use super::*;
+    use sqlx::PgPool;
 
     #[sqlx::test(migrations = "../migrations")]
     fn insert_creates_new_subscriber_record(pool: PgPool) {
@@ -107,15 +90,14 @@ mod tests {
             .await
             .expect("Failed to insert new record");
 
-        let subscription =
-            sqlx::query_as!(Subscription, "select * from subscriptions where id=$1", id)
-                .fetch_one(&pool)
-                .await
-                .expect("Failed to query for record");
+        let row = sqlx::query!("select * from subscriptions where id=$1", id)
+            .fetch_one(&pool)
+            .await
+            .expect("Failed to query for record");
 
-        assert_eq!(id, subscription.id);
-        assert_eq!(new_subscriber.name, subscription.name.parse().unwrap());
-        assert_eq!(new_subscriber.email, subscription.email.parse().unwrap());
+        assert_eq!(id, row.id);
+        assert_eq!(new_subscriber.name, row.name.parse().unwrap());
+        assert_eq!(new_subscriber.email, row.email.parse().unwrap());
     }
 
     #[sqlx::test(migrations = "../migrations")]
@@ -133,13 +115,12 @@ mod tests {
             .await
             .expect("Failed to confirm record");
 
-        let subscription =
-            sqlx::query_as!(Subscription, "select * from subscriptions where id=$1", id)
-                .fetch_one(&pool)
-                .await
-                .expect("Failed to query for record");
+        let row = sqlx::query!("select * from subscriptions where id=$1", id)
+            .fetch_one(&pool)
+            .await
+            .expect("Failed to query for record");
 
-        assert!(subscription.confirmed_at.is_some());
+        assert!(row.confirmed_at.is_some());
     }
 
     #[sqlx::test(migrations = "../migrations")]
@@ -160,4 +141,3 @@ mod tests {
         assert!(confirmed.is_empty());
     }
 }
-

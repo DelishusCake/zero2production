@@ -6,7 +6,8 @@ use serde::Deserialize;
 use sqlx::PgPool;
 
 use zero2prod::client::{Email, EmailClient};
-use zero2prod::repo::SubscriptionRepo;
+use zero2prod::domain::EmailAddress;
+use zero2prod::repo::{ConfirmedSubscription, SubscriptionRepo};
 
 use crate::auth::Administrator;
 use crate::error::{RestError, RestResult};
@@ -43,28 +44,37 @@ async fn publish(
     email_client: web::Data<EmailClient>,
 ) -> RestResult<impl Responder> {
     let pool = pool.get_ref();
-
+    // Get the email to send out from the body
     let email: Email = body.0.try_into()?;
-
-    for subscription in SubscriptionRepo::fetch_all_confirmed(pool).await? {
-        match subscription.email.parse() {
-            Ok(recipient) => {
-                email_client
-                    .send(&recipient, &email)
-                    .await
-                    .map_err(RestError::FailedToSendEmail)?;
-            }
-            Err(error) => {
-                tracing::warn!(
-                    error.cause_chain = ?error,
-                    "Skipping a confirmed subscription (id: {}, email: {})", 
-                    subscription.id, 
-                    subscription.email);
-            }
-        };
+    // Get the list of confirmed email subscriptions, filtering out bad data
+    let recipients: Vec<EmailAddress> = SubscriptionRepo::fetch_all_confirmed(pool)
+        .await?
+        .into_iter()
+        .filter_map(parse_confirmed_email)
+        .collect();
+    // Send the emails out
+    // TODO: Find a better method to send email blast
+    for recipient in recipients {
+        email_client
+            .send(&recipient, &email)
+            .await
+            .map_err(RestError::FailedToSendEmail)?;
     }
-
     Ok(HttpResponse::Ok())
+}
+
+fn parse_confirmed_email(subscription: ConfirmedSubscription) -> Option<EmailAddress> {
+    subscription
+        .email
+        .parse()
+        .map_err(|error| {
+            tracing::warn!(
+                error.cause_chain = ?error,
+                "Skipping a confirmed subscription (id: {}, email: {})", 
+                subscription.id, 
+                subscription.email);
+        })
+        .ok()
 }
 
 /// Subscriptions API endpoints
