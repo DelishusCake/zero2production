@@ -4,7 +4,5 @@ pub mod client;
 pub mod crypto;
 /// Domain objects
 pub mod domain;
-/// Models
-pub mod model;
 /// Repositories
 pub mod repo;

@@ -9,8 +9,7 @@ use url::Url;
 
 use zero2prod::client::{Email, EmailClient};
 use zero2prod::crypto::{SigningKey, Token};
-use zero2prod::model::NewSubscription;
-use zero2prod::repo::{PgSubscriptionRepo, SubscriptionRepo};
+use zero2prod::repo::{SubscriptionRepo, NewSubscription};
 
 use crate::error::{RestError, RestResult};
 
@@ -55,7 +54,7 @@ async fn create(
     {
         let mut tx = pool.begin().await?;
         // Insert the new subscription
-        let id = PgSubscriptionRepo::insert(&mut *tx, &new_subscription).await?;
+        let id = SubscriptionRepo::insert(&mut *tx, &new_subscription).await?;
         // Sign a confirmation token for the user to use when confirming their email
         let token = Token::builder(id)
             .sign(signing_key.as_ref())
@@ -95,7 +94,7 @@ async fn confirm(
         .and_then(|token| token.verify(signing_key.as_ref()))
         .map_err(RestError::FailedToVerifyToken)?;
     // Confirm the subscription
-    PgSubscriptionRepo::confirm_by_id(pool.get_ref(), subscription_id).await?;
+    SubscriptionRepo::confirm_by_id(pool.get_ref(), subscription_id).await?;
 
     Ok(HttpResponse::Ok())
 }

@@ -9,15 +9,15 @@ $$ language plpgsql;
 
 -- Create the subscriptions table
 create table if not exists subscriptions(
-	id uuid primary key not null default gen_random_uuid(),
+  id uuid primary key not null default gen_random_uuid(),
 
-	name  text not null,
-	email text not null unique,
+  name  text not null,
+  email text not null unique,
 
-	confirmed_at timestamptz default null,
+  confirmed_at timestamptz default null,
 
-	created_at timestamptz not null default now(),
-	updated_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 -- Create the update trigger for subscriptions

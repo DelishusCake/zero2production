@@ -1,47 +1,54 @@
 use uuid::Uuid;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 
-use sqlx::{Executor, PgExecutor};
+use serde::Serialize;
 
-use crate::model::{ConfirmedSubscription, NewSubscription};
+use sqlx::PgExecutor;
 
-/// Subscription repository trait, must be implemented for each database used.
-/// NOTE: Intended to facilitate easier testing/mocking
-/// TODO: Swap async-trait for std async traits when those become stable
-/// https://github.com/orgs/rust-lang/projects/28/views/2?pane=issue&itemId=21990165
-#[async_trait::async_trait]
-pub trait SubscriptionRepo {
-    type DB: sqlx::Database;
+use crate::domain::{EmailAddress, PersonName};
 
-    /// Insert a new subscriber into the database
-    async fn insert<'con>(
-        executor: impl Executor<'con, Database = Self::DB>,
-        new_subscriber: &NewSubscription,
-    ) -> sqlx::Result<Uuid>;
-
-    /// Confirm an existing subscriber by database ID
-    async fn confirm_by_id<'con>(
-        executor: impl Executor<'con, Database = Self::DB>,
-        id: Uuid,
-    ) -> sqlx::Result<()>;
-
-    /// Fetch all subscribers that have been confirmed
-    async fn fetch_all_confirmed<'con>(
-        executor: impl Executor<'con, Database = Self::DB>,
-    ) -> sqlx::Result<Vec<ConfirmedSubscription>>;
+/// New Subscription request
+#[derive(Debug)]
+pub struct NewSubscription {
+    pub name: PersonName,
+    pub email: EmailAddress,
 }
 
-/// Postgres Subscription Repositiory
+/// Stored Subscription record
+#[derive(Debug, Serialize)]
+pub struct Subscription {
+    /// ID of the subscription
+    pub id: Uuid,
+    /// User supplied data
+    /// TODO: Should these be parsed back into domain objects?
+    pub name: String,
+    pub email: String,
+    /// Confirmation timestamp.
+    /// `None` if the subscription is not confirmed, and therefore cannot receive newsletter emails
+    pub confirmed_at: Option<DateTime<Utc>>,
+    /// Creation and update timestamps
+    /// NOTE: Auto-set and updated by database triggers
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Stored subscription record that has been confirmed via email
 #[derive(Debug)]
-pub struct PgSubscriptionRepo;
+pub struct ConfirmedSubscription {
+    /// ID of the subscription
+    pub id: Uuid,
+    /// User supplied email
+    /// TODO: Should this be parsed back into domain objects?
+    pub email: String,
+}
 
-#[async_trait::async_trait]
-impl SubscriptionRepo for PgSubscriptionRepo {
-    type DB = sqlx::Postgres;
+/// Repository for interfacing with subscription-related tables
+pub struct SubscriptionRepo;
 
+impl SubscriptionRepo {
     #[tracing::instrument(name = "Insert subscriber", skip(executor))]
-    async fn insert<'con>(
+    pub async fn insert<'con>(
         executor: impl PgExecutor<'con>,
         new_subscriber: &NewSubscription,
     ) -> sqlx::Result<Uuid> {
@@ -57,7 +64,7 @@ impl SubscriptionRepo for PgSubscriptionRepo {
     }
 
     #[tracing::instrument(name = "Confirm a subscriber by id", skip(executor))]
-    async fn confirm_by_id<'con>(executor: impl PgExecutor<'con>, id: Uuid) -> sqlx::Result<()> {
+    pub async fn confirm_by_id<'con>(executor: impl PgExecutor<'con>, id: Uuid) -> sqlx::Result<()> {
         let confirmed_at = Utc::now();
         sqlx::query!(
             "update subscriptions set confirmed_at=$2 where id=$1",
@@ -70,7 +77,7 @@ impl SubscriptionRepo for PgSubscriptionRepo {
     }
 
     #[tracing::instrument(name = "Fetch all confirmed subscriptions", skip(executor))]
-    async fn fetch_all_confirmed<'con>(
+    pub async fn fetch_all_confirmed<'con>(
         executor: impl PgExecutor<'con>,
     ) -> sqlx::Result<Vec<ConfirmedSubscription>> {
         let subscriptions = sqlx::query_as!(
@@ -87,9 +94,6 @@ impl SubscriptionRepo for PgSubscriptionRepo {
 #[cfg(test)]
 mod tests {
     use sqlx::PgPool;
-
-    use crate::model::{NewSubscription, Subscription};
-
     use super::*;
 
     #[sqlx::test(migrations = "../migrations")]
@@ -99,7 +103,7 @@ mod tests {
             name: "Test Name".parse().unwrap(),
         };
 
-        let id = PgSubscriptionRepo::insert(&pool, &new_subscriber)
+        let id = SubscriptionRepo::insert(&pool, &new_subscriber)
             .await
             .expect("Failed to insert new record");
 
@@ -121,11 +125,11 @@ mod tests {
             name: "Test Name".parse().unwrap(),
         };
 
-        let id = PgSubscriptionRepo::insert(&pool, &new_subscriber)
+        let id = SubscriptionRepo::insert(&pool, &new_subscriber)
             .await
             .expect("Failed to insert new record");
 
-        PgSubscriptionRepo::confirm_by_id(&pool, id)
+        SubscriptionRepo::confirm_by_id(&pool, id)
             .await
             .expect("Failed to confirm record");
 
@@ -145,14 +149,15 @@ mod tests {
             name: "Test Name".parse().unwrap(),
         };
 
-        PgSubscriptionRepo::insert(&pool, &new_subscriber)
+        SubscriptionRepo::insert(&pool, &new_subscriber)
             .await
             .expect("Failed to insert new record");
 
-        let confirmed = PgSubscriptionRepo::fetch_all_confirmed(&pool)
+        let confirmed = SubscriptionRepo::fetch_all_confirmed(&pool)
             .await
             .expect("Failed to fetch confirmed");
 
         assert!(confirmed.is_empty());
     }
 }
+

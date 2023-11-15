@@ -6,7 +6,7 @@ use serde::Deserialize;
 use sqlx::PgPool;
 
 use zero2prod::client::{Email, EmailClient};
-use zero2prod::repo::{PgSubscriptionRepo, SubscriptionRepo};
+use zero2prod::repo::SubscriptionRepo;
 
 use crate::auth::Administrator;
 use crate::error::{RestError, RestResult};
@@ -46,7 +46,7 @@ async fn publish(
 
     let email: Email = body.0.try_into()?;
 
-    for subscription in PgSubscriptionRepo::fetch_all_confirmed(pool).await? {
+    for subscription in SubscriptionRepo::fetch_all_confirmed(pool).await? {
         match subscription.email.parse() {
             Ok(recipient) => {
                 email_client
