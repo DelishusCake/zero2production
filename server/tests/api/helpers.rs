@@ -11,10 +11,13 @@ use serde::Serialize;
 
 use url::Url;
 
+use uuid::Uuid;
+
 use wiremock::MockServer;
 
 use zero2prod::client::EmailClient;
 use zero2prod::crypto::SigningKey;
+use zero2prod::repo::{NewUser, UsersRepo};
 
 use server::app;
 
@@ -35,7 +38,7 @@ pub struct Newsletter {
     pub content: Option<NewsletterContent>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Credentials {
     pub username: String,
     pub password: String,
@@ -138,5 +141,50 @@ impl TestApp {
             .json(newsletter)
             .send()
             .await
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TestUser {
+    pub id: Uuid,
+    pub email: String,
+    pub password: String,
+}
+
+impl TestUser {
+    pub async fn register(pool: &PgPool, email: &str, password: &str) -> Self {
+        use argon2::password_hash::SaltString;
+        use argon2::{Argon2, PasswordHasher};
+
+        let salt = SaltString::generate(&mut rand::thread_rng());
+
+        let password_hash = Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .expect("Failed to hash user password")
+            .to_string();
+
+        let new_user = NewUser {
+            email: email.parse().expect("Failed to parse email address"),
+            password_hash,
+        };
+
+        let id = UsersRepo::insert(pool, &new_user)
+            .await
+            .expect("Failed to insert test user");
+
+        let email = email.to_string();
+        let password = password.to_string();
+        Self {
+            id,
+            email,
+            password,
+        }
+    }
+
+    pub fn credentials(&self) -> Credentials {
+        Credentials {
+            username: self.email.clone(),
+            password: self.password.clone(),
+        }
     }
 }

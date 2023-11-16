@@ -1,26 +1,21 @@
-use chrono::{DateTime, Utc};
+use secrecy::Secret;
 
 use sqlx::PgExecutor;
 
 use uuid::Uuid;
 
-use crate::domain::OAuth2Provider;
+use crate::domain::EmailAddress;
 
 #[derive(Debug)]
 pub struct NewUser {
-    pub oauth2_provider: OAuth2Provider,
-    pub oauth2_provider_id: String,
+    pub email: EmailAddress,
+    pub password_hash: String,
 }
 
 #[derive(Debug)]
-pub struct User {
+pub struct UserCredentials {
     pub id: Uuid,
-
-    pub oauth2_provider: OAuth2Provider,
-    pub oauth2_provider_id: String,
-
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub password_hash: Secret<String>,
 }
 
 pub struct UsersRepo;
@@ -31,30 +26,76 @@ impl UsersRepo {
         executor: impl PgExecutor<'conn>,
         new_user: &NewUser,
     ) -> sqlx::Result<Uuid> {
+        let email = new_user.email.as_ref();
+        let password_hash = &new_user.password_hash;
         let row = sqlx::query!(
-            "insert into users(oauth2_provider, oauth2_provider_id) values ($1, $2) returning id;",
-            new_user.oauth2_provider.as_ref(),
-            &new_user.oauth2_provider_id
+            "insert into users(email, password_hash) values ($1, $2) returning id;",
+            email,
+            password_hash
         )
         .fetch_one(executor)
         .await?;
         Ok(row.id)
     }
 
-    #[tracing::instrument("Fetch a user record by OAuth2 provider and ID", skip(executor))]
-    pub async fn fetch_by_oauth2<'conn>(
+    pub async fn fetch_credentials_by_email<'conn>(
         executor: impl PgExecutor<'conn>,
-        oauth2_provider: OAuth2Provider,
-        oauth2_provider_id: &str,
-    ) -> sqlx::Result<Option<User>> {
-        let maybe_user = sqlx::query_as!(
-            User,
-            r#"select * from users where oauth2_provider=$1 and oauth2_provider_id=$2"#,
-            oauth2_provider.as_ref(),
-            oauth2_provider_id,
+        email: &EmailAddress,
+    ) -> sqlx::Result<Option<UserCredentials>> {
+        let maybe_credentials = sqlx::query_as!(
+            UserCredentials,
+            "select id, password_hash from users where email=$1",
+            email.as_ref()
         )
         .fetch_optional(executor)
         .await?;
-        Ok(maybe_user)
+        Ok(maybe_credentials)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use secrecy::ExposeSecret;
+    use sqlx::PgPool;
+
+    #[sqlx::test(migrations = "../migrations")]
+    fn can_insert_new_users(pool: PgPool) {
+        let new_user = NewUser {
+            email: "test@test.com".parse().unwrap(),
+            password_hash: "test_password_hash".into(),
+        };
+
+        let id = UsersRepo::insert(&pool, &new_user)
+            .await
+            .expect("Failed to insert new user");
+
+        let row = sqlx::query!("select * from users where id=$1", id)
+            .fetch_one(&pool)
+            .await
+            .expect("Failed to fetch inserted row");
+        assert_eq!(id, row.id);
+        assert_eq!(new_user.email.as_ref(), &row.email);
+        assert_eq!(new_user.password_hash, row.password_hash);
+    }
+
+    #[sqlx::test(migrations = "../migrations")]
+    fn can_fetch_user_credentials_by_email(pool: PgPool) {
+        let new_user = NewUser {
+            email: "test@test.com".parse().unwrap(),
+            password_hash: "test_password_hash".into(),
+        };
+
+        let user_id = UsersRepo::insert(&pool, &new_user)
+            .await
+            .expect("Failed to insert new user");
+
+        let creds = UsersRepo::fetch_credentials_by_email(&pool, &new_user.email)
+            .await
+            .expect("Failed to fetch user credentials by email")
+            .expect("Fetched credentials are empty");
+
+        assert_eq!(user_id, creds.id);
+        assert_eq!(&new_user.password_hash, creds.password_hash.expose_secret());
     }
 }

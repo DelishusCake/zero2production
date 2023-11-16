@@ -25,7 +25,7 @@ impl FromStr for OAuth2Provider {
             value => {
                 tracing::warn!("Attempt to parse unknown OAuth2 provider \"{}\"", value);
                 Self::Unknown(value.to_string())
-            },
+            }
         };
         Ok(value)
     }

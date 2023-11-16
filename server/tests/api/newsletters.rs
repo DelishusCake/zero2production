@@ -2,10 +2,13 @@ use reqwest::StatusCode;
 
 use sqlx::PgPool;
 
+use uuid::Uuid;
+
 use wiremock::matchers::*;
 use wiremock::{Mock, ResponseTemplate};
 
-use crate::helpers::{Credentials, NewSubscriber, Newsletter, NewsletterContent, TestApp};
+use crate::helpers::{Credentials, TestApp, TestUser};
+use crate::helpers::{NewSubscriber, Newsletter, NewsletterContent};
 
 #[sqlx::test(migrations = "../migrations")]
 async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
@@ -13,7 +16,9 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
 ) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
-    let creds = generate_creds();
+    let creds = TestUser::register(&pool, "test@test.com", "test_password")
+        .await
+        .credentials();
 
     create_unconfirmed_subscriber(&app).await;
 
@@ -62,10 +67,38 @@ async fn newsletters_without_credentials_are_unauthorized(pool: PgPool) -> sqlx:
 }
 
 #[sqlx::test(migrations = "../migrations")]
+async fn newsletters_with_bad_credentials_are_rejected(pool: PgPool) -> sqlx::Result<()> {
+    let app = TestApp::spawn(&pool).await;
+
+    let creds = Credentials {
+        username: Uuid::new_v4().to_string(),
+        password: Uuid::new_v4().to_string(),
+    };
+
+    let newsletter = Newsletter {
+        title: Some("Newsletter Title".into()),
+        content: Some(NewsletterContent {
+            text: Some("Newsletter Body".into()),
+            html: Some("<p>Newsletter Body</p>".into()),
+        }),
+    };
+    let res = app
+        .newsletter_publish(Some(&creds), &newsletter)
+        .await
+        .expect("Failed to send request to create newsletter");
+
+    assert!(res.status().is_client_error());
+
+    Ok(())
+}
+
+#[sqlx::test(migrations = "../migrations")]
 async fn malformed_newsletters_are_rejected(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
-    let creds = generate_creds();
+    let creds = TestUser::register(&pool, "test@test.com", "test_password")
+        .await
+        .credentials();
 
     Mock::given(any())
         .respond_with(ResponseTemplate::new(200))
@@ -130,7 +163,9 @@ async fn newsletters_are_not_delivered_to_subscribers_with_bad_emails(
 ) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
-    let creds = generate_creds();
+    let creds = TestUser::register(&pool, "test@test.com", "test_password")
+        .await
+        .credentials();
 
     create_confirmed_subscriber(&pool, "Test Name A", "good_email_a@test.com").await;
     create_confirmed_subscriber(&pool, "Test Name B", "good_email_b@test.com").await;
@@ -157,15 +192,6 @@ async fn newsletters_are_not_delivered_to_subscribers_with_bad_emails(
     assert_eq!(StatusCode::OK, res.status());
 
     Ok(())
-}
-
-fn generate_creds() -> Credentials {
-    use uuid::Uuid;
-
-    Credentials {
-        username: Uuid::new_v4().to_string(),
-        password: Uuid::new_v4().to_string(),
-    }
 }
 
 async fn create_unconfirmed_subscriber(app: &TestApp) {
