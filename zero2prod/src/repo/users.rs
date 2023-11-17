@@ -38,6 +38,7 @@ impl UsersRepo {
         Ok(row.id)
     }
 
+    #[tracing::instrument("Fetch user authentication records", skip(executor))]
     pub async fn fetch_credentials_by_email<'conn>(
         executor: impl PgExecutor<'conn>,
         email: &EmailAddress,
