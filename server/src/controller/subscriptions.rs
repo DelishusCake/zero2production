@@ -1,17 +1,18 @@
 use actix_web::dev::HttpServiceFactory;
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::http::StatusCode;
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder, ResponseError};
 
 use serde::Deserialize;
 
 use sqlx::PgPool;
 
+use thiserror::Error;
+
 use url::Url;
 
 use zero2prod::client::{Email, EmailClient};
-use zero2prod::crypto::{SigningKey, Token};
+use zero2prod::crypto::{SigningKey, Token, TokenError};
 use zero2prod::repo::{NewSubscription, SubscriptionRepo};
-
-use crate::error::{RestError, RestResult};
 
 /// Form deserialization wrapper for parsing new subscriptions
 #[derive(Debug, Deserialize)]
@@ -43,11 +44,12 @@ async fn create(
     signing_key: web::Data<SigningKey>,
     email_client: web::Data<EmailClient>,
     form: web::Form<NewSubscriptionForm>,
-) -> RestResult<impl Responder> {
+) -> Result<impl Responder, SubscribeError> {
     // Unwrap the signing key
     let signing_key = signing_key.get_ref();
     // Parse the new subscriber form
-    let new_subscription: NewSubscription = form.0.try_into().map_err(RestError::ParseError)?;
+    let new_subscription: NewSubscription =
+        form.0.try_into().map_err(SubscribeError::ParseError)?;
 
     // Transaction context
     // The subscription request should fail if something goes wrong
@@ -58,7 +60,7 @@ async fn create(
         // Sign a confirmation token for the user to use when confirming their email
         let token = Token::builder(id)
             .sign(signing_key.as_ref())
-            .map_err(RestError::FailedToSignToken)?;
+            .map_err(SubscribeError::SignTokenError)?;
         // Get the confirmation URL to send to the user
         let confirmation_url = req.url_for("confirm_subscription", [&token])?;
         // Build the confirmation email
@@ -68,7 +70,7 @@ async fn create(
         email_client
             .send(&recipient, &email)
             .await
-            .map_err(RestError::FailedToSendEmail)?;
+            .map_err(SubscribeError::SendEmailError)?;
         // Commit the new subscriber to the database if everything worked
         tx.commit().await?;
     }
@@ -83,7 +85,7 @@ async fn confirm(
     pool: web::Data<PgPool>,
     signing_key: web::Data<SigningKey>,
     path: web::Path<(String,)>,
-) -> RestResult<impl Responder> {
+) -> Result<impl Responder, SubscribeError> {
     // Get the string for the confirmation token from the URL path
     let (token_str,) = path.into_inner();
     // Unwrap the signing key
@@ -92,7 +94,7 @@ async fn confirm(
     let subscription_id = token_str
         .parse::<Token>()
         .and_then(|token| token.verify(signing_key.as_ref()))
-        .map_err(RestError::FailedToVerifyToken)?;
+        .map_err(SubscribeError::VerifyTokenError)?;
     // Confirm the subscription
     SubscriptionRepo::confirm_by_id(pool.get_ref(), subscription_id).await?;
 
@@ -113,6 +115,40 @@ fn build_confirmation_email(subscription: &NewSubscription, confirmation_url: Ur
         subject,
         html_body,
         text_body,
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum SubscribeError {
+    #[error("Failed to parse {0}")]
+    ParseError(String),
+
+    #[error("Failed to sign token")]
+    SignTokenError(TokenError),
+
+    #[error("Failed to verify token")]
+    VerifyTokenError(TokenError),
+
+    #[error("Internal Server Error")]
+    GenerateUrlError(#[from] actix_web::error::UrlGenerationError),
+
+    #[error("Internal Server Error")]
+    SendEmailError(#[from] reqwest::Error),
+
+    #[error("Internal Server Error")]
+    DatabaseError(#[from] sqlx::Error),
+}
+
+impl ResponseError for SubscribeError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            Self::ParseError(_) => StatusCode::BAD_REQUEST,
+            Self::VerifyTokenError(_) => StatusCode::UNAUTHORIZED,
+            Self::DatabaseError(_)
+            | Self::SignTokenError(_)
+            | Self::SendEmailError(_)
+            | Self::GenerateUrlError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
     }
 }
 
