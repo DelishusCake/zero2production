@@ -165,7 +165,7 @@ impl TestUser {
 
         let new_user = NewUser {
             email: email.parse().expect("Failed to parse email address"),
-            password_hash,
+            password_hash: password_hash.into(),
         };
 
         let id = UsersRepo::insert(pool, &new_user)

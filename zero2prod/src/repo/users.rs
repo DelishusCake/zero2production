@@ -9,7 +9,7 @@ use crate::domain::EmailAddress;
 #[derive(Debug)]
 pub struct NewUser {
     pub email: EmailAddress,
-    pub password_hash: String,
+    pub password_hash: Secret<String>,
 }
 
 #[derive(Debug)]
@@ -26,12 +26,12 @@ impl UsersRepo {
         executor: impl PgExecutor<'conn>,
         new_user: &NewUser,
     ) -> sqlx::Result<Uuid> {
-        let email = new_user.email.as_ref();
-        let password_hash = &new_user.password_hash;
+        use secrecy::ExposeSecret;
+
         let row = sqlx::query!(
             "insert into users(email, password_hash) values ($1, $2) returning id;",
-            email,
-            password_hash
+            new_user.email.as_ref(),
+            new_user.password_hash.expose_secret(),
         )
         .fetch_one(executor)
         .await?;
@@ -64,7 +64,7 @@ mod tests {
     fn can_insert_new_users(pool: PgPool) {
         let new_user = NewUser {
             email: "test@test.com".parse().unwrap(),
-            password_hash: "test_password_hash".into(),
+            password_hash: "test_password_hash".to_string().into(),
         };
 
         let id = UsersRepo::insert(&pool, &new_user)
@@ -77,14 +77,14 @@ mod tests {
             .expect("Failed to fetch inserted row");
         assert_eq!(id, row.id);
         assert_eq!(new_user.email.as_ref(), &row.email);
-        assert_eq!(new_user.password_hash, row.password_hash);
+        assert_eq!(new_user.password_hash.expose_secret(), &row.password_hash);
     }
 
     #[sqlx::test(migrations = "../migrations")]
     fn can_fetch_user_credentials_by_email(pool: PgPool) {
         let new_user = NewUser {
             email: "test@test.com".parse().unwrap(),
-            password_hash: "test_password_hash".into(),
+            password_hash: "test_password_hash".to_string().into(),
         };
 
         let user_id = UsersRepo::insert(&pool, &new_user)
@@ -97,6 +97,6 @@ mod tests {
             .expect("Fetched credentials are empty");
 
         assert_eq!(user_id, creds.id);
-        assert_eq!(&new_user.password_hash, creds.password_hash.expose_secret());
+        assert_eq!(new_user.password_hash.expose_secret(), creds.password_hash.expose_secret());
     }
 }
