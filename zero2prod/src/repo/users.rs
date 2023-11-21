@@ -97,6 +97,9 @@ mod tests {
             .expect("Fetched credentials are empty");
 
         assert_eq!(user_id, creds.id);
-        assert_eq!(new_user.password_hash.expose_secret(), creds.password_hash.expose_secret());
+        assert_eq!(
+            new_user.password_hash.expose_secret(),
+            creds.password_hash.expose_secret()
+        );
     }
 }
