@@ -1,4 +1,3 @@
-use std::fmt;
 use std::str::FromStr;
 
 use hmac::Mac;
@@ -12,14 +11,11 @@ use base64::{
     engine::{self, general_purpose},
     Engine as _,
 };
-use regex::Regex;
 
 lazy_static::lazy_static! {
     // Base64 deserialization engine
     static ref BASE64_ENGINE: engine::GeneralPurpose =
         engine::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD);
-    // Regex for checking token strings
-    static ref TOKEN_REGEX: Regex = Regex::new(r"^([\w_-]+).([\w_-]+)$").unwrap();
 }
 
 /// Various errors that can occur when handling tokens
@@ -56,7 +52,7 @@ impl From<base64::DecodeError> for TokenError {
 pub type TokenResult<T> = Result<T, TokenError>;
 
 // A serialized, cryptographically-signed token
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token(String);
 
 impl Token {
@@ -81,17 +77,10 @@ impl Token {
     }
 
     fn split(&self) -> Option<(&str, &str)> {
-        let captures = TOKEN_REGEX.captures(&self.0)?;
-
-        let msg = captures.get(1)?.as_str();
-        let sig = captures.get(2)?.as_str();
+        let mut matches = self.0.splitn(2, '.');
+        let msg = matches.next()?;
+        let sig = matches.next()?;
         Some((msg, sig))
-    }
-}
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
 
@@ -104,12 +93,8 @@ impl AsRef<str> for Token {
 impl FromStr for Token {
     type Err = TokenError;
 
-    fn from_str(token: &str) -> TokenResult<Self> {
-        if !TOKEN_REGEX.is_match(token) {
-            Err(TokenError::DecodeEncodeError)
-        } else {
-            Ok(Self(token.to_string()))
-        }
+    fn from_str(token: &str) -> Result<Self, Self::Err> {
+        Ok(Self(token.to_string()))
     }
 }
 
@@ -206,10 +191,9 @@ impl<T: for<'de> Deserialize<'de>> TokenMessage<T> {
 /// Convert a TokenBuilder into a TokenMessage
 impl<T> From<TokenBuilder<T>> for TokenMessage<T> {
     fn from(value: TokenBuilder<T>) -> Self {
-        Self {
-            exp: value.expiration.map(|d| d.timestamp()),
-            data: value.payload,
-        }
+        let exp = value.expiration.map(|date| date.timestamp());
+        let data = value.payload;
+        Self { exp, data }
     }
 }
 

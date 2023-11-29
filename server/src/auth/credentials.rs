@@ -6,10 +6,12 @@ use secrecy::Secret;
 
 const BASIC_AUTH_PREFIX: &str = "Basic ";
 
-#[derive(Debug)]
-pub struct Credentials {
-    pub username: String,
-    pub password: Secret<String>,
+#[derive(Debug, Clone)]
+pub enum Credentials {
+    Basic {
+        username: String,
+        password: Secret<String>,
+    },
 }
 
 impl Credentials {
@@ -31,17 +33,13 @@ impl Credentials {
 
     /// Extract credentials from a string formatted as 'Basic <base64 credentials>'
     pub fn from_basic(header_value: &str) -> anyhow::Result<Self> {
-        use base64::Engine;
         // Strip the 'basic' prefix from the header
         let header_value = header_value
             .strip_prefix(BASIC_AUTH_PREFIX)
             .context("Authorization scheme not basic")?;
         // Base64 decode the credential string
-        let decoded_value = base64::engine::general_purpose::STANDARD
-            .decode(header_value)
-            .context("Failed to decode authorization header")?;
         let decoded_value =
-            String::from_utf8(decoded_value).context("Failed to decode authorization header")?;
+            string_from_base64(header_value).context("Failed to decode authorization header")?;
         // Split the string by the colon, extract the credentials
         let mut matches = decoded_value.splitn(2, ':');
         let username = matches.next().context("Missing email in authorization")?;
@@ -49,11 +47,18 @@ impl Credentials {
             .next()
             .context("Missing password in authorization")?;
 
-        Ok(Self {
+        Ok(Self::Basic {
             username: username.into(),
             password: Secret::new(password.into()),
         })
     }
+}
+
+fn string_from_base64(value: &str) -> anyhow::Result<String> {
+    use base64::Engine;
+    let value = base64::engine::general_purpose::STANDARD.decode(value)?;
+    let value = String::from_utf8(value)?;
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -76,8 +81,7 @@ mod tests {
 
         let creds = Credentials::from_headers(&headers).expect("Failed to parse headers");
 
-        assert_eq!(username, creds.username);
-        assert_eq!(password, creds.password.expose_secret());
+        check_basic(&creds, username, password);
     }
 
     #[test]
@@ -89,8 +93,19 @@ mod tests {
 
         let creds = Credentials::from_basic(&basic_auth).expect("Failed to parse headers");
 
-        assert_eq!(username, creds.username);
-        assert_eq!(password, creds.password.expose_secret());
+        check_basic(&creds, username, password);
+    }
+
+    fn check_basic(creds: &Credentials, username: &str, password: &str) {
+        match creds {
+            Credentials::Basic {
+                username: cred_username,
+                password: cred_password,
+            } => {
+                assert_eq!(username, cred_username);
+                assert_eq!(password, cred_password.expose_secret());
+            }
+        }
     }
 
     fn generate_basic_authorization(username: &str, password: &str) -> String {

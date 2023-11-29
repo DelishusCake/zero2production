@@ -55,23 +55,24 @@ impl AsRef<Uuid> for Administrator {
 
 #[tracing::instrument("Validate credentials", skip(credentials, pool))]
 async fn validate_credentials(pool: &PgPool, credentials: &Credentials) -> Result<Uuid, AuthError> {
-    let email: EmailAddress = credentials
-        .username
-        .parse()
-        .map_err(AuthError::ParseError)?;
-    let password = credentials.password.clone();
+    match credentials {
+        Credentials::Basic { username, password } => {
+            let email: EmailAddress = username.parse().map_err(AuthError::ParseError)?;
 
-    let user = UsersRepo::fetch_credentials_by_email(pool, &email)
-        .await?
-        .context("No user stored for email")
-        .map_err(AuthError::AuthenticationError)?;
+            let user = UsersRepo::fetch_credentials_by_email(pool, &email)
+                .await?
+                .context("No user stored for email")
+                .map_err(AuthError::AuthenticationError)?;
 
-    spawn_blocking_with_tracing(move || verify_password_hash(password, user.password_hash))
-        .await
-        .context("Failed to spawn blocking task")?
-        .map_err(AuthError::AuthenticationError)?;
+            let password = password.clone();
+            spawn_blocking_with_tracing(move || verify_password_hash(password, user.password_hash))
+                .await
+                .context("Failed to spawn blocking task")?
+                .map_err(AuthError::AuthenticationError)?;
 
-    Ok(user.id)
+            Ok(user.id)
+        }
+    }
 }
 
 #[tracing::instrument("Verify password hash", skip(password, password_hash))]
