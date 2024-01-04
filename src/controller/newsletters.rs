@@ -8,11 +8,10 @@ use sqlx::PgPool;
 
 use thiserror::Error;
 
-use zero2prod::client::{Email, EmailClient};
-use zero2prod::domain::EmailAddress;
-use zero2prod::repo::{ConfirmedSubscription, SubscriptionRepo};
-
 use crate::auth::Administrator;
+use crate::client::{Email, EmailClient};
+use crate::domain::EmailAddress;
+use crate::repo::{ConfirmedSubscription, SubscriptionRepo};
 
 #[derive(Debug, Deserialize)]
 pub struct PublishBody {

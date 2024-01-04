@@ -2,7 +2,7 @@ use sqlx::PgPool;
 
 use crate::helpers::TestApp;
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn is_present(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 

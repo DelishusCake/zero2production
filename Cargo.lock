@@ -407,9 +407,9 @@ dependencies = [
 
 [[package]]
 name = "brotli-decompressor"
-version = "2.5.0"
+version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da74e2b81409b1b743f8f0c62cc6254afefb8b8e50bbfe3735550f7aeefa3448"
+checksum = "4e2e4afe60d7dd600fdd3de8d0f08c2b7ec039712e3b6137ff98b7004e82de4f"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
@@ -2214,38 +2214,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "anyhow",
- "argon2",
- "base64 0.21.4",
- "chrono",
- "claims",
- "config",
- "fake",
- "linkify",
- "rand 0.8.5",
- "reqwest",
- "secrecy",
- "serde",
- "serde-aux",
- "serde_json",
- "sqlx",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-actix-web",
- "tracing-log",
- "tracing-subscriber",
- "url",
- "uuid",
- "wiremock",
- "zero2prod",
-]
-
-[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3227,14 +3195,18 @@ dependencies = [
 name = "zero2prod"
 version = "0.1.0"
 dependencies = [
+ "actix-web",
  "anyhow",
+ "argon2",
  "async-trait",
  "base64 0.21.4",
  "chrono",
  "claims",
+ "config",
  "fake",
  "hmac",
  "lazy_static",
+ "linkify",
  "quickcheck",
  "quickcheck_macros",
  "rand 0.8.5",
@@ -3242,13 +3214,16 @@ dependencies = [
  "reqwest",
  "secrecy",
  "serde",
+ "serde-aux",
  "serde_json",
  "sha2",
  "sqlx",
  "thiserror",
  "tokio",
  "tracing",
+ "tracing-actix-web",
  "tracing-log",
+ "tracing-subscriber",
  "unicode-segmentation",
  "url",
  "uuid",

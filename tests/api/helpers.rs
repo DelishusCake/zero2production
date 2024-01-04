@@ -15,11 +15,10 @@ use uuid::Uuid;
 
 use wiremock::MockServer;
 
+use zero2prod::app;
 use zero2prod::client::EmailClient;
 use zero2prod::crypto::SigningKey;
 use zero2prod::repo::{NewUser, UsersRepo};
-
-use server::app;
 
 #[derive(Debug, Serialize)]
 pub struct NewSubscriber {

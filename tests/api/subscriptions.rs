@@ -7,7 +7,7 @@ use wiremock::{Mock, ResponseTemplate};
 
 use crate::helpers::{NewSubscriber, TestApp};
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn subcribe_returns_success_for_valid_request(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
@@ -39,7 +39,7 @@ async fn subcribe_returns_success_for_valid_request(pool: PgPool) -> sqlx::Resul
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn subcribe_returns_bad_request_for_missing_data(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
@@ -89,7 +89,7 @@ async fn subcribe_returns_bad_request_for_missing_data(pool: PgPool) -> sqlx::Re
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn subcribe_sends_a_confirmation_email_for_valid_request(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
@@ -116,7 +116,7 @@ async fn subcribe_sends_a_confirmation_email_for_valid_request(pool: PgPool) -> 
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn subcribe_sends_a_confirmation_email_with_link(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
@@ -149,7 +149,7 @@ async fn subcribe_sends_a_confirmation_email_with_link(pool: PgPool) -> sqlx::Re
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn subscription_can_be_confirmed(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
@@ -208,7 +208,7 @@ async fn subscription_can_be_confirmed(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn subcribe_is_consistent_if_email_send_fails(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 

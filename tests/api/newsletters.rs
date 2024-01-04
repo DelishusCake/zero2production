@@ -10,7 +10,7 @@ use wiremock::{Mock, ResponseTemplate};
 use crate::helpers::{Credentials, TestApp, TestUser};
 use crate::helpers::{NewSubscriber, Newsletter, NewsletterContent};
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
     pool: PgPool,
 ) -> sqlx::Result<()> {
@@ -45,7 +45,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers(
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn newsletters_without_credentials_are_unauthorized(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
@@ -66,7 +66,7 @@ async fn newsletters_without_credentials_are_unauthorized(pool: PgPool) -> sqlx:
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn newsletters_with_bad_credentials_are_rejected(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
@@ -92,7 +92,7 @@ async fn newsletters_with_bad_credentials_are_rejected(pool: PgPool) -> sqlx::Re
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn malformed_newsletters_are_rejected(pool: PgPool) -> sqlx::Result<()> {
     let app = TestApp::spawn(&pool).await;
 
@@ -157,7 +157,7 @@ async fn malformed_newsletters_are_rejected(pool: PgPool) -> sqlx::Result<()> {
     Ok(())
 }
 
-#[sqlx::test(migrations = "../migrations")]
+#[sqlx::test]
 async fn newsletters_are_not_delivered_to_subscribers_with_bad_emails(
     pool: PgPool,
 ) -> sqlx::Result<()> {

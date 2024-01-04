@@ -15,7 +15,7 @@ use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
 use url::Url;
 
-use zero2prod::domain::EmailAddress;
+use crate::domain::EmailAddress;
 
 /// Runtime environment, either `Dev` for local development, or `Prod` for release
 #[derive(Debug)]

@@ -10,9 +10,9 @@ use thiserror::Error;
 
 use url::Url;
 
-use zero2prod::client::{Email, EmailClient};
-use zero2prod::crypto::{SigningKey, Token, TokenError};
-use zero2prod::repo::{NewSubscription, SubscriptionRepo};
+use crate::client::{Email, EmailClient};
+use crate::crypto::{SigningKey, Token, TokenError};
+use crate::repo::{NewSubscription, SubscriptionRepo};
 
 /// Form deserialization wrapper for parsing new subscriptions
 #[derive(Debug, Deserialize)]

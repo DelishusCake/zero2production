@@ -8,10 +8,9 @@ use sqlx::PgPool;
 
 use tracing_actix_web::TracingLogger;
 
-use zero2prod::client::EmailClient;
-use zero2prod::crypto::SigningKey;
-
+use crate::client::EmailClient;
 use crate::controller::{newsletters, subscriptions};
+use crate::crypto::SigningKey;
 
 /// Simple health-check endpoint
 #[tracing::instrument(name = "Health check")]

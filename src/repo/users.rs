@@ -60,7 +60,7 @@ mod tests {
     use secrecy::ExposeSecret;
     use sqlx::PgPool;
 
-    #[sqlx::test(migrations = "../migrations")]
+    #[sqlx::test]
     fn can_insert_new_users(pool: PgPool) {
         let new_user = NewUser {
             email: "test@test.com".parse().unwrap(),
@@ -80,7 +80,7 @@ mod tests {
         assert_eq!(new_user.password_hash.expose_secret(), &row.password_hash);
     }
 
-    #[sqlx::test(migrations = "../migrations")]
+    #[sqlx::test]
     fn can_fetch_user_credentials_by_email(pool: PgPool) {
         let new_user = NewUser {
             email: "test@test.com".parse().unwrap(),

@@ -16,10 +16,9 @@ use thiserror::Error;
 
 use uuid::Uuid;
 
-use zero2prod::domain::EmailAddress;
-use zero2prod::repo::UsersRepo;
-
 use crate::auth::Credentials;
+use crate::domain::EmailAddress;
+use crate::repo::UsersRepo;
 use crate::telemetry::spawn_blocking_with_tracing;
 
 #[derive(Debug)]

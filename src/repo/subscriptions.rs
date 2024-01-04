@@ -79,7 +79,7 @@ mod tests {
     use super::*;
     use sqlx::PgPool;
 
-    #[sqlx::test(migrations = "../migrations")]
+    #[sqlx::test]
     fn insert_creates_new_subscriber_record(pool: PgPool) {
         let new_subscriber = NewSubscription {
             email: "test@test.com".parse().unwrap(),
@@ -100,7 +100,7 @@ mod tests {
         assert_eq!(new_subscriber.email, row.email.parse().unwrap());
     }
 
-    #[sqlx::test(migrations = "../migrations")]
+    #[sqlx::test]
     fn confirm_sets_confirmed_at(pool: PgPool) {
         let new_subscriber = NewSubscription {
             email: "test@test.com".parse().unwrap(),
@@ -123,7 +123,7 @@ mod tests {
         assert!(row.confirmed_at.is_some());
     }
 
-    #[sqlx::test(migrations = "../migrations")]
+    #[sqlx::test]
     fn fetch_all_confirmed_does_not_return_unconfirmed_records(pool: PgPool) {
         let new_subscriber = NewSubscription {
             email: "test@test.com".parse().unwrap(),

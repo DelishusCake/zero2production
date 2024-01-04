@@ -2,12 +2,11 @@ use std::net::TcpListener;
 
 use sqlx::PgPool;
 
+use zero2prod::app;
 use zero2prod::client::EmailClient;
 use zero2prod::crypto::SigningKey;
-
-use server::app;
-use server::settings::Settings;
-use server::telemetry::{create_subscriber, set_subscriber};
+use zero2prod::settings::Settings;
+use zero2prod::telemetry::{create_subscriber, set_subscriber};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
