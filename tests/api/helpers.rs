@@ -81,7 +81,7 @@ impl TestApp {
             let api_auth_token = Secret::new("TestAuthorization".into());
             let api_timeout = Duration::from_secs(2);
 
-            EmailClient::new(sender, api_timeout, api_base_url, api_auth_token)
+            EmailClient::new(sender, api_timeout, &api_base_url, api_auth_token)
                 .expect("Failed to create email client")
         };
 

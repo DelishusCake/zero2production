@@ -111,9 +111,9 @@ mod tests {
     fn generate_basic_authorization(username: &str, password: &str) -> String {
         use base64::Engine;
 
-        let username_password = format!("{}:{}", username, password);
+        let username_password = format!("{username}:{password}");
         let username_password = base64::engine::general_purpose::STANDARD.encode(username_password);
 
-        format!("Basic {}", username_password)
+        format!("Basic {username_password}")
     }
 }

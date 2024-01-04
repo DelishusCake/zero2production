@@ -27,7 +27,7 @@ impl EmailClient {
     pub fn new(
         sender: EmailAddress,
         api_timeout: Duration,
-        api_base_url: Url,
+        api_base_url: &Url,
         api_auth_token: Secret<String>,
     ) -> anyhow::Result<Self> {
         let client = Client::builder().timeout(api_timeout).build()?;
@@ -192,6 +192,6 @@ mod tests {
         let mock_api_url = Url::parse(server_uri).unwrap();
         let mock_api_auth: Secret<String> = Faker.fake::<String>().parse().unwrap();
 
-        EmailClient::new(sender, mock_api_timeout, mock_api_url, mock_api_auth).unwrap()
+        EmailClient::new(sender, mock_api_timeout, &mock_api_url, mock_api_auth).unwrap()
     }
 }

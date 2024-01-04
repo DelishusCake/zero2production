@@ -75,7 +75,7 @@ mod tests {
     fn long_email_valid() {
         let domain = "@test.com".to_string();
         let subject = "ё".repeat(256 - domain.len());
-        let email = format!("{}{}", subject, domain);
+        let email = format!("{subject}{domain}");
 
         assert_ok!(email.parse::<EmailAddress>());
     }
@@ -84,7 +84,7 @@ mod tests {
     fn too_long_email_invalid() {
         let domain = "@test.com".to_string();
         let subject = "ё".repeat(258 - domain.len());
-        let email = format!("{}{}", subject, domain);
+        let email = format!("{subject}{domain}");
 
         assert_err!(email.parse::<EmailAddress>());
     }

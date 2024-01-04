@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     let email_client = EmailClient::new(
         settings.email.sender(),
         settings.email.api_timeout(),
-        settings.email.api_base_url(),
+        &settings.email.api_base_url(),
         settings.email.api_auth_token(),
     )?;
     // Start listening on the application address

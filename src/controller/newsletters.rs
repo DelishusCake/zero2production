@@ -11,7 +11,7 @@ use thiserror::Error;
 use crate::auth::Administrator;
 use crate::client::{Email, EmailClient};
 use crate::domain::EmailAddress;
-use crate::repo::{ConfirmedSubscription, SubscriptionRepo};
+use crate::repo::SubscriptionRepo;
 
 #[derive(Debug, Deserialize)]
 pub struct PublishBody {
@@ -51,7 +51,19 @@ async fn publish(
     let recipients: Vec<EmailAddress> = SubscriptionRepo::fetch_all_confirmed(pool)
         .await?
         .into_iter()
-        .filter_map(parse_confirmed_email)
+        .filter_map(|subscription| {
+            subscription
+                .email
+                .parse()
+                .map_err(|error| {
+                    tracing::warn!(
+                        error.cause_chain = ?error,
+                        "Skipping a confirmed subscription (id: {}, email: {})", 
+                        subscription.id, 
+                        subscription.email);
+                })
+                .ok()
+        })
         .collect();
     // Send the emails out
     // TODO: Find a better method to send email blast
@@ -62,20 +74,6 @@ async fn publish(
             .map_err(NewsletterError::SendEmailError)?;
     }
     Ok(HttpResponse::Ok())
-}
-
-fn parse_confirmed_email(subscription: ConfirmedSubscription) -> Option<EmailAddress> {
-    subscription
-        .email
-        .parse()
-        .map_err(|error| {
-            tracing::warn!(
-                error.cause_chain = ?error,
-                "Skipping a confirmed subscription (id: {}, email: {})", 
-                subscription.id, 
-                subscription.email);
-        })
-        .ok()
 }
 
 #[derive(Debug, Error)]
@@ -96,6 +94,7 @@ impl ResponseError for NewsletterError {
 }
 
 /// Subscriptions API endpoints
+#[must_use]
 pub fn scope() -> impl HttpServiceFactory {
     web::scope("/newsletters").service(publish)
 }

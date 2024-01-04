@@ -68,19 +68,15 @@ impl Token {
         K: Mac + Clone,
     {
         // Split the token string into it's base64 encoded components
-        let (msg, sig) = self.split().ok_or(TokenError::DecodeEncodeError)?;
+        let (msg, sig) = self
+            .0
+            .split_once('.')
+            .ok_or(TokenError::DecodeEncodeError)?;
         // Decode the components
         let msg = BASE64_ENGINE.decode(msg)?;
         let sig = BASE64_ENGINE.decode(sig)?;
         // Verify and deserialize the message
         TokenMessage::verify_from_bytes(key, &msg, &sig)
-    }
-
-    fn split(&self) -> Option<(&str, &str)> {
-        let mut matches = self.0.splitn(2, '.');
-        let msg = matches.next()?;
-        let sig = matches.next()?;
-        Some((msg, sig))
     }
 }
 
@@ -136,7 +132,7 @@ impl<T: Serialize> TokenBuilder<T> {
         let msg = BASE64_ENGINE.encode(msg);
         let sig = BASE64_ENGINE.encode(sig);
         // Combine to the final token string
-        let token = format!("{}.{}", msg, sig);
+        let token = format!("{msg}.{sig}");
         // Return the wrapped token
         Ok(Token(token))
     }
@@ -182,13 +178,12 @@ impl<T: for<'de> Deserialize<'de>> TokenMessage<T> {
             // NOTE: Default to the earliest date in ambiguous instances for security reasons
             .and_then(|exp| Utc.timestamp_opt(exp, 0u32).earliest())
             // Check if the current Utc timestamp is greater than the expiration
-            .map(|exp| Utc::now() > exp)
             // Default to considering the token as expired if the timestamp is invalid
-            .unwrap_or(false)
+            .is_some_and(|exp| Utc::now() > exp)
     }
 }
 
-/// Convert a TokenBuilder into a TokenMessage
+/// Convert a `TokenBuilder` into a `TokenMessage`
 impl<T> From<TokenBuilder<T>> for TokenMessage<T> {
     fn from(value: TokenBuilder<T>) -> Self {
         let exp = value.expiration.map(|date| date.timestamp());
@@ -213,10 +208,10 @@ where
 {
     let message_signature = sign_message(key, msg);
     // Verify that the hmac signature matches the passed signature
-    if message_signature[..] != signature[..] {
-        Err(TokenError::SignatureMismatch)
-    } else {
+    if message_signature[..] == signature[..] {
         Ok(())
+    } else {
+        Err(TokenError::SignatureMismatch)
     }
 }
 

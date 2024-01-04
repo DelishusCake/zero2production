@@ -18,13 +18,14 @@ use url::Url;
 use crate::domain::EmailAddress;
 
 /// Runtime environment, either `Dev` for local development, or `Prod` for release
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Runtime {
     Dev,
     Prod,
 }
 
 impl Runtime {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             Runtime::Dev => "dev",
@@ -96,10 +97,12 @@ pub struct ApplicationSettings {
 
 impl ApplicationSettings {
     /// The application address to bind to
+    #[must_use]
     pub fn addr(&self) -> (&str, u16) {
         (&self.host, self.port)
     }
     /// The application secret key
+    #[must_use]
     pub fn secret_key(&self) -> &Secret<String> {
         &self.secret_key
     }
@@ -118,6 +121,7 @@ pub struct DatabaseSettings {
 
 impl DatabaseSettings {
     /// The database connection options, without specifying the database name
+    #[must_use]
     pub fn without_db(&self) -> PgConnectOptions {
         use secrecy::ExposeSecret;
 
@@ -135,6 +139,7 @@ impl DatabaseSettings {
             .password(self.password.expose_secret())
     }
     /// The database connection options, with the database name
+    #[must_use]
     pub fn with_db(&self) -> PgConnectOptions {
         self.without_db().database(&self.name)
     }
@@ -151,20 +156,24 @@ pub struct EmailSettings {
 
 impl EmailSettings {
     /// The email address to send application emails from
+    #[must_use]
     pub fn sender(&self) -> EmailAddress {
         self.sender
             .parse()
             .expect("Failed to parse email sender address")
     }
     /// The email REST API timeout duration
+    #[must_use]
     pub fn api_timeout(&self) -> Duration {
         Duration::from_millis(self.api_timeout_milliseconds)
     }
     /// The base URL for the email REST service
+    #[must_use]
     pub fn api_base_url(&self) -> Url {
         Url::parse(&self.api_base_url).expect("Failed to parse email base URL")
     }
     /// The authentication token to enclude when making email requests
+    #[must_use]
     pub fn api_auth_token(&self) -> Secret<String> {
         self.api_auth_token.clone()
     }
